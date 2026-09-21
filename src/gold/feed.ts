@@ -1,7 +1,7 @@
 import { parseTick } from "./state";
 import type { GoldTrader } from "./trader";
 
-/** Optional dry-run feed: poll a JSON tick URL when no EA is posting. */
+/** Optional custom JSON tick URL. Wins over the built-in live gold spot. */
 export function startFeedPoller(trader: GoldTrader, url: string, intervalMs: number): () => void {
   let stopped = false;
   let warned = false;

@@ -147,7 +147,7 @@ function applySnapshot(s: Snapshot): void {
     model.className = `badge ${jev ? "jev" : "standin"}`;
   }
   const feed = $("feed");
-  if (feed) feed.textContent = s.feed ?? (s.dryRun ? "demo" : "live");
+  if (feed) feed.textContent = s.feed ?? "live";
   if (typeof s.horizonMs === "number" && s.horizonMs > 0) horizonMs = s.horizonMs;
   if (s.totals) totals = s.totals;
   dummyEnabled = s.dummyMt5 !== false;

@@ -18,6 +18,8 @@ export const GOLD_ENV_KEYS = [
   "GOLD_REVERSE",
   "GOLD_CONTRACT_SIZE",
   "XAUUSD_FEED_URL",
+  "XAUUSD_SPOT_URL",
+  "XAUUSD_SPOT_REFRESH_MS",
 ] as const;
 
 export function applyWorkerEnv(env: Record<string, unknown>): void {

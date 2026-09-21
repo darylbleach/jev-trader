@@ -40,7 +40,14 @@ export const goldConfig = {
   jevModelId: env("JEV_MODEL_ID", "jev-latest")!,
   jevUsdPerMTok: 0.042,
   feedUrl: env("XAUUSD_FEED_URL"),
-  /** Built-in XAUUSD walk so `bun run gold` is a watchable demo without MT5. */
+  /**
+   * When true and no XAUUSD_FEED_URL is set, poll a public XAUUSD spot so the
+   * demo decides on live gold. Set false for production so only JevLeader posts /tick.
+   */
   demo: env("GOLD_DEMO", "true") !== "false",
+  /** Public XAUUSD spot used by the built-in live demo poller. */
+  spotUrl: env("XAUUSD_SPOT_URL", "https://api.gold-api.com/price/XAU")!,
+  /** How often to refresh the live spot. Decisions still run every intervalMs. */
+  spotRefreshMs: Number(env("XAUUSD_SPOT_REFRESH_MS", "5000")),
   historySize: 1000,
 };
