@@ -338,9 +338,9 @@ function renderDummy(): void {
   if (tapeEl) {
     const rows = [...dummyTape].reverse().slice(0, 16).map((t) => {
       const verb = closeVerb(t.reason);
-      return `<div class="row"><span>#${t.ticket}</span><span class="${t.side}">${t.side.toUpperCase()} in</span><span>${t.openPrice.toFixed(2)}</span><span class="${t.reason}">${verb} ${t.closePrice.toFixed(2)}</span><span class="${tone(t.pnl)}">${money(t.pnl)}</span></div>`;
+      return `<div class="row"><span class="t-id">#${t.ticket}</span><span class="t-side ${t.side}">${t.side.toUpperCase()} in</span><span class="t-open">${t.openPrice.toFixed(2)}</span><span class="t-close ${t.reason}">${verb} ${t.closePrice.toFixed(2)}</span><span class="t-pnl ${tone(t.pnl)}">${money(t.pnl)}</span></div>`;
     });
-    tapeEl.innerHTML = rows.join("") || `<div class="row"><span></span><span></span><span>no dummy trades yet</span><span></span><span></span></div>`;
+    tapeEl.innerHTML = rows.join("") || `<div class="row empty"><span class="t-open">no dummy trades yet</span></div>`;
   }
   renderPnL();
 }

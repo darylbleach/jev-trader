@@ -1,6 +1,6 @@
 import { goldConfig } from "./config";
 import { DummyMt5Account } from "./dummy-mt5";
-import type { GoldModel } from "./model";
+import type { GoldModel } from "./model-mock";
 import { nextPosition, type PositionSide, type SignalSide } from "./policy";
 import { MidRing, type GoldTick } from "./state";
 import { DecisionThrottle } from "./throttle";

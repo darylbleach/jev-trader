@@ -1,9 +1,29 @@
 import { GoldRoom } from "./gold-room";
 import { CORS } from "./http";
+import { GOLD_PAGES } from "./page";
 
 export { GoldRoom };
 
-const PAGE_PATHS = new Set(["/", "/demo", "/index.html", "/demo.css", "/demo.js"]);
+const PAGE_ALIASES: Record<string, string> = {
+  "/": "/",
+  "/demo": "/",
+  "/index.html": "/",
+  "/demo.css": "/demo.css",
+  "/demo.js": "/demo.js",
+};
+
+function pageResponse(pathname: string): Response | null {
+  const key = PAGE_ALIASES[pathname];
+  if (!key) return null;
+  const page = GOLD_PAGES[key];
+  if (!page) return null;
+  return new Response(page.body, {
+    headers: {
+      "content-type": page.type,
+      "cache-control": "no-store",
+    },
+  });
+}
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -11,14 +31,10 @@ export default {
     const url = new URL(request.url);
     const stub = env.GOLD_ROOM.getByName("xauusd");
 
-    if (PAGE_PATHS.has(url.pathname)) {
+    const page = pageResponse(url.pathname);
+    if (page) {
       ctx.waitUntil(stub.ensureTicking());
-      if (url.pathname === "/demo") {
-        const index = new URL(request.url);
-        index.pathname = "/index.html";
-        return env.ASSETS.fetch(new Request(index, request));
-      }
-      return env.ASSETS.fetch(request);
+      return page;
     }
 
     return stub.fetch(request);

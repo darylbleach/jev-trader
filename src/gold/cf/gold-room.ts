@@ -59,10 +59,10 @@ export class GoldRoom extends DurableObject<Env> {
   private async boot(): Promise<GoldHttpTrader> {
     applyWorkerEnv(this.env as unknown as Record<string, unknown>);
     if (this.trader && this.meta) return this.trader;
-    const { createGoldModel } = await import("../model");
+    const { GoldMockModel } = await import("../model-mock");
     const { GoldTrader } = await import("../trader");
     const { goldConfig } = await import("../config");
-    const model = createGoldModel();
+    const model = new GoldMockModel();
     const trader = new GoldTrader(model);
     this.intervalMs = goldConfig.intervalMs > 0 ? goldConfig.intervalMs : 1000;
     this.meta = {

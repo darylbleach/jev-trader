@@ -19,7 +19,18 @@ if (!built.success) {
   for (const log of built.logs) console.error(log);
   throw new Error("gold demo client bundle failed");
 }
-const js = built.outputs[0];
-if (!js) throw new Error("gold demo client bundle produced no output");
-await Bun.write(new URL("demo.js", publicDir), await js.text());
-console.log("prepared src/gold/cf/public");
+const jsOut = built.outputs[0];
+if (!jsOut) throw new Error("gold demo client bundle produced no output");
+const js = await jsOut.text();
+await Bun.write(new URL("demo.js", publicDir), js);
+
+const pages = {
+  "/": { body: page, type: "text/html;charset=utf-8" },
+  "/demo.css": { body: css, type: "text/css;charset=utf-8" },
+  "/demo.js": { body: js, type: "text/javascript;charset=utf-8" },
+};
+
+const pageModule = `export const GOLD_PAGES: Record<string, { body: string; type: string }> = ${JSON.stringify(pages)};\n`;
+await Bun.write(new URL("../src/gold/cf/page.ts", import.meta.url), pageModule);
+
+console.log("prepared src/gold/cf/public and src/gold/cf/page.ts");

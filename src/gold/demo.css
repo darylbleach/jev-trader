@@ -36,6 +36,7 @@ html,
 body {
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
 }
 
 body {
@@ -44,6 +45,7 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
 }
 
 .card {
@@ -61,13 +63,29 @@ body {
 .header {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px 16px;
   padding: 16px 24px;
+}
+
+.brand-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
 }
 
 .brand {
   font-weight: 600;
   font-size: 16px;
+}
+
+.pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .pair,
@@ -162,6 +180,7 @@ body {
   font-variant-numeric: tabular-nums;
   font-size: 15px;
   color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 
 .last-ticket.up {
@@ -412,6 +431,7 @@ body {
   font-size: 16px;
   color: var(--ink-2);
   white-space: nowrap;
+  flex: none;
 }
 
 .dummy-open {
@@ -466,6 +486,33 @@ body {
 }
 
 @media (max-width: 899px) {
+  .card {
+    max-width: calc(100% - 16px);
+    margin: 8px auto;
+    border-radius: 14px;
+  }
+
+  .header,
+  .pnl-band,
+  .stats,
+  .main,
+  .dummy,
+  .foot {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .header {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .pills {
+    margin-left: 0;
+  }
+
   .main {
     flex-direction: column;
   }
@@ -479,12 +526,18 @@ body {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  .header {
-    flex-wrap: wrap;
-  }
-
   .dummy-head {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dummy-record {
+    white-space: normal;
+  }
+
+  .dummy-open {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .pnl-grid {
@@ -495,7 +548,116 @@ body {
     font-size: 28px;
   }
 
+  #chart {
+    height: 200px;
+  }
+
   .dummy-tape .row {
-    grid-template-columns: 44px 64px 1fr 64px;
+    grid-template-columns: 44px 1fr auto;
+    grid-template-areas:
+      "id side pnl"
+      "open close close";
+    row-gap: 2px;
+  }
+
+  .dummy-tape .t-id { grid-area: id; }
+  .dummy-tape .t-side { grid-area: side; }
+  .dummy-tape .t-open { grid-area: open; }
+  .dummy-tape .t-close { grid-area: close; }
+  .dummy-tape .t-pnl { grid-area: pnl; }
+
+  .dummy-tape .row.empty {
+    display: block;
+    grid-template-columns: none;
+    grid-template-areas: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .card {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .header,
+  .pnl-band,
+  .stats,
+  .main,
+  .dummy,
+  .foot {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .dummy,
+  .foot {
+    margin-left: max(12px, env(safe-area-inset-left));
+    margin-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .stat {
+    padding: 8px 10px;
+  }
+
+  .price-row {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .price {
+    font-size: 28px;
+  }
+
+  .headline {
+    font-size: 22px;
+  }
+
+  .pnl-card {
+    padding: 12px 14px;
+  }
+
+  .pnl-v {
+    font-size: 26px;
+  }
+
+  .last-ticket,
+  .dummy-open,
+  .order,
+  .dummy-note,
+  .foot {
+    overflow-wrap: anywhere;
+  }
+
+  .tape .row {
+    grid-template-columns: 36px 40px 1fr 40px;
+    font-size: 11px;
+  }
+
+  .pill,
+  .badge {
+    padding: 6px 10px;
+  }
+
+  #chart {
+    height: 168px;
+  }
+
+  .right {
+    border-radius: 14px;
+  }
+
+  .panel,
+  .tape-wrap {
+    padding-left: 14px;
+    padding-right: 14px;
   }
 }
