@@ -11,6 +11,15 @@ export function nextPosition(current: PositionSide, signal: SignalSide, reverse:
   return reverse ? signal : "flat";
 }
 
+/**
+ * An open scalp stays on until stop or take profit.
+ * A flat book takes the latest buy or sell.
+ */
+export function holdScalp(current: PositionSide, signal: SignalSide): PositionSide {
+  if (current === "flat") return signal;
+  return current;
+}
+
 export interface LotScaleInput {
   leaderLot: number;
   leaderEquity: number;

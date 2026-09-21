@@ -92,7 +92,7 @@ A signal looks like this (fields that matter to the EAs):
 
 `slPoints` / `tpPoints` default to 80 / 120. On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $0.80 stop loss and $1.20 take profit. Every new market order always gets both, so a scalp takes a small win or cuts instead of sitting for a multi dollar move. The EAs also raise the distance to `SYMBOL_TRADE_STOPS_LEVEL` so the broker does not reject the order.
 
-Netting-style: one side at a time. Opposite signal closes, then opens, when `GOLD_REVERSE=true` (default). No pyramiding.
+Netting-style: one side at a time. The open scalp stays on until its stop or take profit. The next ticket uses the latest buy or sell. No pyramiding.
 
 ## Live gold prices on the demo
 
@@ -100,7 +100,7 @@ The demo no longer invents a price path after one seed.
 
 1. Every `XAUUSD_SPOT_REFRESH_MS` (default 1s) the process fetches `XAUUSD_SPOT_URL` (default `https://api.gold-api.com/price/XAU`). gold-api serves `Cache-Control: max-age=1`.
 2. If that fails, it tries Yahoo COMEX gold futures (`GC=F`) as a fallback.
-3. Jev still answers every `GOLD_INTERVAL_MS` (default 1s) on the last live mid. Spot gold can still sit still between prints. The dummy tape holds a reverse until the mid has moved at least `GOLD_MIN_REVERSE_POINTS` (default 1 point) so a flip on a flat quote does not scratch at $0.
+3. Jev still answers every `GOLD_INTERVAL_MS` (default 1s) on the last live mid. Spot gold can still sit still between prints. The dummy tape keeps the open scalp until price touches the stop or the take profit.
 4. If a live quote has landed and the next fetch fails, the last live mid is held. No walk.
 5. If no live quote has ever landed, a small walk around 2650 keeps the page alive and the feed pill says `demo`.
 
@@ -187,8 +187,8 @@ Every ~200 ms the leader:
 2. POSTs them to `/tick`. That is the production price feed.
 3. GETs `/signal`.
 4. Drops the tick if HTTP failed, `ts` is stale, `spreadOk` is false, or the broker spread is above the cap.
-5. On a new `seq`, opens, reverses, or flattens to match `position`.
-6. After a fill, POSTs `/fill` so the dashboard can show the real ticket.
+5. On a new `seq`, opens when flat, or flattens when `position` is `flat`. It does not market-close an open ticket just to flip.
+6. After an open, POSTs `/fill`. A broker stop or target also POSTs `/fill` with `kind` `close` and `reason` `sl` or `tp`, which flattens the published position.
 
 SL/TP on the new order: EA input if > 0, else signal points, else 80 / 120, then clamp to `SYMBOL_TRADE_STOPS_LEVEL`. Confirm the attached SL and TP on the ticket in the Trade tab. If they are missing, the broker rejected stops and the scalp may not close. If a chart was already attached with the old 600 / 800 inputs, reset those inputs or the EA will keep the wider stops.
 
@@ -234,11 +234,11 @@ If leader and follower ever sit on one account, keep the magic numbers different
 ## Rollout order
 
 1. Demo with no MT5. `bun run gold`, open `/demo`. Pill says `live`. Mid should be around the real gold spot (thousands of dollars, not the old 2650 walk). Dummy tickets open and close with P and L.
-2. Paper leader only. `GOLD_DEMO=false`, `GOLD_DRY_RUN=false`. Attach `JevLeader` on a demo account. Watch the Experts log, `/demo`, and the Trade tab: opens, reverses, SL/TP exits.
+2. Paper leader only. `GOLD_DEMO=false`, `GOLD_DRY_RUN=false`. Attach `JevLeader` on a demo account. Watch the Experts log, `/demo`, and the Trade tab: opens, then SL/TP exits. An opposite call should leave the ticket on.
 3. One paper follower. Check lot scaling and that the follower lags the leader. They copy the signal, not the ticket.
 4. Tiny live lots (`GOLD_LOT=0.01`, follower `InpMaxLot` clamped). Then raise `InpLotMult` if you want.
 
-Keep `GOLD_REVERSE=true` unless you explicitly want an opposite signal to flatten instead of flip.
+The open scalp is held until stop or take profit. `GOLD_REVERSE` is still on the signal for older readers and does not scratch the open ticket.
 
 ## Fail-closed behavior
 
@@ -280,7 +280,7 @@ They do not retry a missed `seq`. The next new `seq` is the next trade. A brief 
 | `GOLD_MAX_LOT` | `1` | server-side cap |
 | `GOLD_SL_POINTS` | `80` | rides on `/signal` |
 | `GOLD_TP_POINTS` | `120` | rides on `/signal` |
-| `GOLD_REVERSE` | `true` | flip on opposite signal |
+| `GOLD_REVERSE` | `true` | kept on the signal; the open scalp still waits for SL or TP |
 | `GOLD_MAX_SPREAD_PIPS` | `30` | `spreadOk` threshold |
 | `XAUUSD_FEED_URL` | unset | leave unset in production |
 | `XAUUSD_SPOT_URL` | gold-api XAU | demo only |

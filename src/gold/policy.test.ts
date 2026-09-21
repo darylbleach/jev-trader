@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { clampStopsLevel, midPrice, nextPosition, resolveExitPoints, scaleLots, spreadPips } from "./policy";
+import { clampStopsLevel, holdScalp, midPrice, nextPosition, resolveExitPoints, scaleLots, spreadPips } from "./policy";
 
 test("equal equity copies the leader lot", () => {
   expect(scaleLots({
@@ -100,6 +100,14 @@ test("opposite signal reverses when enabled", () => {
 
 test("opposite signal flattens when reverse is off", () => {
   expect(nextPosition("buy", "sell", false)).toBe("flat");
+});
+
+test("an open scalp holds until it is flat again", () => {
+  expect(holdScalp("flat", "buy")).toBe("buy");
+  expect(holdScalp("flat", "sell")).toBe("sell");
+  expect(holdScalp("buy", "sell")).toBe("buy");
+  expect(holdScalp("sell", "buy")).toBe("sell");
+  expect(holdScalp("buy", "buy")).toBe("buy");
 });
 
 test("spread and mid", () => {

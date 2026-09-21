@@ -1,7 +1,7 @@
 import { goldConfig } from "./config";
 import { DummyMt5Account } from "./dummy-mt5";
 import type { GoldModel } from "./model-mock";
-import { nextPosition, type PositionSide, type SignalSide } from "./policy";
+import { holdScalp, type PositionSide } from "./policy";
 import { MidRing, type GoldTick } from "./state";
 import { DecisionThrottle } from "./throttle";
 import type { DummyPnL, DummyTicket, DummyTrade, GoldEvent, GoldFill, GoldSignal, GoldTotals } from "./types";
@@ -156,6 +156,7 @@ export class GoldTrader {
     const mid = (tick.bid + tick.ask) / 2;
     this.ring.push(mid);
     this.applyDummyStops(mid, now);
+    if (this.dummy) this.position = this.dummy.openTicket?.side ?? "flat";
 
     const gate = this.throttle.tryStart(now);
     if (gate.kind === "late") {
@@ -208,7 +209,7 @@ export class GoldTrader {
 
       const action = decision.action;
       if (action === "buy" || action === "sell") {
-        this.position = this.apply(this.position, action, goldConfig.reverse);
+        this.position = holdScalp(this.position, action);
       }
       this.syncDummy(this.position, mid, now);
       if (this.dummy) {
@@ -271,6 +272,10 @@ export class GoldTrader {
     }, mid);
     this.onEvent(this.pushHistory(event));
     this.onFill(recorded);
+    if (!this.dummy && (recorded.reason === "sl" || recorded.reason === "tp")) {
+      this.position = "flat";
+      if (this.lastSignal) this.lastSignal = { ...this.lastSignal, position: "flat" };
+    }
     return recorded;
   }
 
@@ -283,19 +288,6 @@ export class GoldTrader {
   private syncDummy(want: PositionSide, mid: number, now: number): void {
     if (!this.dummy) return;
     for (const fill of this.dummy.sync(want, mid, now)) this.reportFill(fill);
-  }
-
-  private apply(current: PositionSide, signal: SignalSide, reverse: boolean): PositionSide {
-    switch (signal) {
-      case "buy":
-        return nextPosition(current, "buy", reverse);
-      case "sell":
-        return nextPosition(current, "sell", reverse);
-      default: {
-        const _never: never = signal;
-        return current;
-      }
-    }
   }
 
   private pushHistory(event: GoldEvent): GoldEvent {

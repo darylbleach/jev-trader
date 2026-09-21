@@ -68,21 +68,19 @@ test("reverse at the same mid holds the open ticket", () => {
   expect(acct.openTicket?.side).toBe("buy");
 });
 
-test("reverse closes the old ticket at mid then opens the other side", () => {
+test("an opposite side holds the open scalp until stop or target", () => {
   const acct = new DummyMt5Account(opts);
   acct.sync("buy", 2650, 1);
-  const fills = acct.sync("sell", 2651.5, 2);
-  expect(fills).toHaveLength(2);
-  expect(fills[0]?.kind).toBe("close");
-  expect(fills[0]?.reason).toBe("signal");
-  expect(fills[0]?.price).toBeCloseTo(2651.5);
-  expect(fills[0]?.pnl).toBeCloseTo(1.5);
-  expect(fills[1]?.kind).toBe("open");
-  expect(fills[1]?.side).toBe("sell");
-  expect(fills[1]?.ticket).toBe(2);
+  expect(acct.sync("sell", 2651.5, 2)).toEqual([]);
+  expect(acct.openTicket?.side).toBe("buy");
+  expect(acct.closedTrades).toHaveLength(0);
+  const stopped = acct.checkStops(2644, 3);
+  expect(stopped?.reason).toBe("sl");
+  const next = acct.sync("sell", 2644, 4);
+  expect(next).toHaveLength(1);
+  expect(next[0]?.kind).toBe("open");
+  expect(next[0]?.side).toBe("sell");
   expect(acct.openTicket?.side).toBe("sell");
-  expect(acct.closedTrades).toHaveLength(1);
-  expect(acct.realizedPnl).toBeCloseTo(1.5);
 });
 
 test("flatten closes only", () => {
@@ -127,18 +125,19 @@ test("mid between SL and TP leaves the ticket open", () => {
 test("realized plus floating is combined pnl and last ticket keeps the close", () => {
   const acct = new DummyMt5Account(opts);
   acct.sync("buy", 2650, 1);
-  acct.sync("sell", 2651, 2);
-  expect(acct.lastTicket?.pnl).toBeCloseTo(1);
+  acct.checkStops(2658, 2);
+  expect(acct.lastTicket?.pnl).toBeCloseTo(8);
   expect(acct.winCount).toBe(1);
   expect(acct.lossCount).toBe(0);
-  expect(acct.floatingPnl(2652)).toBeCloseTo(-1);
-  const snap = acct.snapshot(2652);
-  expect(snap.realizedUsd).toBeCloseTo(1);
-  expect(snap.unrealizedUsd).toBeCloseTo(-1);
-  expect(snap.pnlUsd).toBeCloseTo(0);
+  acct.sync("sell", 2652, 3);
+  expect(acct.floatingPnl(2651)).toBeCloseTo(1);
+  const snap = acct.snapshot(2651);
+  expect(snap.realizedUsd).toBeCloseTo(8);
+  expect(snap.unrealizedUsd).toBeCloseTo(1);
+  expect(snap.pnlUsd).toBeCloseTo(9);
   expect(snap.wins).toBe(1);
   expect(snap.losses).toBe(0);
-  expect(snap.lastTicket?.reason).toBe("signal");
+  expect(snap.lastTicket?.reason).toBe("tp");
 });
 
 test("a stop loss is a loss and a take profit is a win", () => {
