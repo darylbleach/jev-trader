@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { GoldDecision, GoldModel } from "./model";
 import type { GoldState } from "./state";
 import { GoldTrader } from "./trader";
-import { startDemoWalk } from "./walk";
+import { demoTickFromMid, nextDemoMid, startDemoWalk } from "./walk";
 
 class FixedModel implements GoldModel {
   readonly name = "fixed";
@@ -27,4 +27,12 @@ test("demo walk posts a tick the model can decide on", async () => {
   expect(s?.spreadOk).toBe(true);
   expect(s?.slPoints).toBeGreaterThan(0);
   expect(s?.tpPoints).toBeGreaterThan(0);
+});
+
+test("walk helpers stay on a tradable XAUUSD quote", () => {
+  const mid = nextDemoMid(2650);
+  expect(mid).toBeGreaterThanOrEqual(100);
+  const tick = demoTickFromMid(2650);
+  expect(tick.ask).toBeGreaterThanOrEqual(tick.bid);
+  expect(tick.bid).toBeGreaterThan(0);
 });

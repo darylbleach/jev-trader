@@ -1,3 +1,5 @@
 node_modules
 .env
 data/
+.wrangler
+src/gold/cf/public/

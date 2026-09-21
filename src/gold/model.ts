@@ -1,6 +1,7 @@
 import { experimental_evaluate } from "ai";
 import { typeSafeAi } from "@ai-sdk/typesafe-ai";
 import { goldConfig } from "./config";
+import { sleep } from "./sleep";
 import type { GoldState } from "./state";
 
 export type GoldAction = "buy" | "sell" | "hold";
@@ -78,7 +79,7 @@ export class GoldMockModel implements GoldModel {
     const buy = 1 / (1 + Math.exp(-signal));
     const probabilities = { buy, sell: 1 - buy, hold: 0 };
     const action: GoldAction = buy >= 0.5 ? "buy" : "sell";
-    await Bun.sleep(80);
+    await sleep(80);
     return {
       action,
       probabilities,
