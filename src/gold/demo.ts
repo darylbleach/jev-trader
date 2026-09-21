@@ -135,11 +135,6 @@ let lastTicket: DummyTrade | null = null;
 let dummyPnl = { realized: 0, floating: 0, wins: 0, losses: 0 };
 let totals = { ticks: 0, decisions: 0, lateTicks: 0, fills: 0, jevUsd: 0 };
 
-function exitLabel(points?: number): string {
-  if (!points) return "-";
-  return `${points} pts ($${(points * 0.01).toFixed(0)})`;
-}
-
 function pct(n: number): string {
   return `${Math.round(n * 100)}%`;
 }
@@ -235,8 +230,6 @@ function renderStats(): void {
     ["JEV USD", totals.jevUsd.toFixed(4)],
     ["HORIZON", horizonMs ? `${horizonMs / 1000}s` : "-"],
     ["SPREAD", latest ? `${latest.spreadPips.toFixed(1)} pips` : "-"],
-    ["SL", exitLabel(latest?.slPoints)],
-    ["TP", exitLabel(latest?.tpPoints)],
     ["WINS", String(dummyPnl.wins)],
     ["LOSSES", String(dummyPnl.losses)],
   ];
