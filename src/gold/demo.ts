@@ -179,7 +179,7 @@ function applySnapshot(s: Snapshot): void {
     for (const e of s.history) {
       mids.push(e.mid);
       latestMid = e.mid;
-      if (e.decision && !e.late) tape.push(e.decision);
+      if (e.decision && !e.late && !e.fill) tape.push(e.decision);
     }
     if (mids.length > 240) mids.splice(0, mids.length - 240);
     if (tape.length > 12) tape.splice(0, tape.length - 12);
