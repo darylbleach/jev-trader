@@ -84,20 +84,19 @@ test("dry-run snapshot exposes realized, open, total, and last ticket pnl", asyn
   expect(open.totals.unrealizedUsd).toBeCloseTo(0);
   expect(open.dummyPnl.totalUsd).toBeCloseTo(0);
 
-  const model = new FixedModel("buy");
-  const flip = new GoldTrader(model, dummyAccount());
-  await flip.onTick({ bid: 2650, ask: 2650 }, 1_000);
-  model.action = "sell";
-  await flip.onTick({ bid: 2651.5, ask: 2651.5 }, 2_000);
-  const snap = flip.snapshot();
-  expect(snap.realizedUsd).toBeCloseTo(1.5);
+  const held = new GoldTrader(new FixedModel("buy"), dummyAccount());
+  await held.onTick({ bid: 2650, ask: 2650 }, 1_000);
+  await held.onTick({ bid: 2658, ask: 2658 }, 2_000);
+  const snap = held.snapshot();
+  expect(snap.lastTicket?.reason).toBe("tp");
+  expect(snap.realizedUsd).toBeCloseTo(8);
   expect(snap.unrealizedUsd).toBeCloseTo(0);
-  expect(snap.pnlUsd).toBeCloseTo(1.5);
+  expect(snap.pnlUsd).toBeCloseTo(8);
   expect(snap.wins).toBe(1);
   expect(snap.losses).toBe(0);
-  expect(snap.lastTicket?.pnl).toBeCloseTo(1.5);
-  expect(snap.totals.realizedUsd).toBeCloseTo(1.5);
-  expect(snap.totals.pnlUsd).toBeCloseTo(1.5);
+  expect(snap.lastTicket?.pnl).toBeCloseTo(8);
+  expect(snap.totals.realizedUsd).toBeCloseTo(8);
+  expect(snap.totals.pnlUsd).toBeCloseTo(8);
   expect(snap.dummyPnl.wins).toBe(1);
 });
 
@@ -154,19 +153,31 @@ test("dummy MT5 holds a reverse while the live mid is unchanged", async () => {
   expect(snap.totals.fills).toBe(1);
 });
 
-test("dummy MT5 reverse closes at mid then opens the other side", async () => {
+test("an opposite signal leaves the open scalp on", async () => {
   const model = new FixedModel("buy");
   const trader = new GoldTrader(model, new DummyMt5Account(dummyOpts));
   await trader.onTick({ bid: 2650, ask: 2650.2 }, 1_000);
   model.action = "sell";
   await trader.onTick({ bid: 2651, ask: 2651.2 }, 2_000);
   const snap = trader.snapshot();
-  expect(snap.position).toBe("sell");
+  expect(snap.latest?.action).toBe("sell");
+  expect(snap.position).toBe("buy");
+  expect(snap.openTicket?.side).toBe("buy");
+  expect(snap.dummyTrades).toHaveLength(0);
+  expect(snap.totals.fills).toBe(1);
+});
+
+test("after take profit the next decision opens the new side", async () => {
+  const model = new FixedModel("buy");
+  const trader = new GoldTrader(model, new DummyMt5Account(dummyOpts));
+  await trader.onTick({ bid: 2650, ask: 2650.2 }, 1_000);
+  model.action = "sell";
+  await trader.onTick({ bid: 2658.1, ask: 2658.3 }, 3_000);
+  const snap = trader.snapshot();
+  expect(snap.dummyTrades[0]?.reason).toBe("tp");
+  expect(snap.dummyTrades[0]?.pnl).toBeGreaterThan(0);
   expect(snap.openTicket?.side).toBe("sell");
-  expect(snap.dummyTrades).toHaveLength(1);
-  expect(snap.dummyTrades[0]?.reason).toBe("signal");
-  expect(snap.dummyTrades[0]?.closePrice).toBeCloseTo(2651.1);
-  expect(snap.totals.fills).toBe(3);
+  expect(snap.position).toBe("sell");
 });
 
 test("dummy MT5 closes on SL touch while the ticket is open", async () => {
@@ -187,6 +198,23 @@ test("dummy MT5 closes on TP touch", async () => {
   const snap = trader.snapshot();
   expect(snap.dummyTrades[0]?.reason).toBe("tp");
   expect(snap.dummyTrades[0]?.pnl).toBeGreaterThan(0);
+});
+
+test("a broker stop flattens the published position", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), null);
+  await trader.onTick({ bid: 2650, ask: 2650.2 }, 1_000);
+  expect(trader.snapshot().position).toBe("buy");
+  trader.reportFill({
+    ticket: 9,
+    side: "buy",
+    lots: 0.01,
+    price: 2644,
+    symbol: "XAUUSD",
+    kind: "close",
+    reason: "sl",
+  });
+  expect(trader.snapshot().position).toBe("flat");
+  expect(trader.signal()?.position).toBe("flat");
 });
 
 test("dummy MT5 can be disabled", async () => {

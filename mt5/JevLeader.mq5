@@ -52,6 +52,37 @@ void OnTick()
 {
 }
 
+void OnTradeTransaction(const MqlTradeTransaction &trans,
+                        const MqlTradeRequest &request,
+                        const MqlTradeResult &result)
+{
+   if(trans.type != TRADE_TRANSACTION_DEAL_ADD)
+      return;
+   if(!HistoryDealSelect(trans.deal))
+      return;
+   if(HistoryDealGetString(trans.deal, DEAL_SYMBOL) != g_symbol)
+      return;
+   if(HistoryDealGetInteger(trans.deal, DEAL_MAGIC) != InpMagic)
+      return;
+   long entry = HistoryDealGetInteger(trans.deal, DEAL_ENTRY);
+   if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_OUT_BY)
+      return;
+   long why = HistoryDealGetInteger(trans.deal, DEAL_REASON);
+   string reason = "";
+   if(why == DEAL_REASON_SL)
+      reason = "sl";
+   else if(why == DEAL_REASON_TP)
+      reason = "tp";
+   else
+      return;
+   long dealType = HistoryDealGetInteger(trans.deal, DEAL_TYPE);
+   string side = dealType == DEAL_TYPE_SELL ? "buy" : "sell";
+   double lots = HistoryDealGetDouble(trans.deal, DEAL_VOLUME);
+   double price = HistoryDealGetDouble(trans.deal, DEAL_PRICE);
+   ulong ticket = (ulong)HistoryDealGetInteger(trans.deal, DEAL_POSITION_ID);
+   PostClose(ticket, side, lots, price, reason);
+}
+
 void OnTimer()
 {
    PostTick();
@@ -112,6 +143,17 @@ void PostFill(const ulong ticket, const string side, const double lots, const do
    JevHttp("POST", JevJoin(InpServer, "/fill"), body, InpTimeoutMs);
 }
 
+void PostClose(const ulong ticket, const string side, const double lots, const double price, const string reason)
+{
+   string body = "{\"ticket\":" + IntegerToString((long)ticket) +
+                 ",\"side\":\"" + side +
+                 "\",\"lots\":" + DoubleToString(lots, 2) +
+                 ",\"price\":" + DoubleToString(price, 5) +
+                 ",\"symbol\":\"" + g_symbol +
+                 "\",\"kind\":\"close\",\"reason\":\"" + reason + "\"}";
+   JevHttp("POST", JevJoin(InpServer, "/fill"), body, InpTimeoutMs);
+}
+
 bool ApplyPosition(const string want, const string action, double lot, const int slPts, const int tpPts)
 {
    int have = JevOurSide(g_symbol, InpMagic);
@@ -133,6 +175,9 @@ bool ApplyPosition(const string want, const string action, double lot, const int
       need = -1;
 
    if(have == need)
+      return true;
+
+   if(have != 0 && need != 0 && have != need)
       return true;
 
    if(have != 0)

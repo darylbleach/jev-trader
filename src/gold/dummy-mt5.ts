@@ -63,7 +63,7 @@ export function slTpHit(ticket: DummyTicket, mid: number): DummyCloseReason | nu
 
 /**
  * In-process stand-in for JevLeader market tickets. Opens at mid, attaches SL/TP,
- * reverses by closing then opening, and exits on SL/TP touch.
+ * and exits on SL/TP touch. An opposite side does not scratch the open ticket.
  */
 export class DummyMt5Account {
   private nextTicket = 1;
@@ -133,21 +133,15 @@ export class DummyMt5Account {
   }
 
   /**
-   * Match JevLeader: if the standing position differs from the open ticket,
-   * close the old one at mid (signal) then open the other side.
-   * Hold a reverse while mid is still at the open (live spot often sits still).
-   * Flatten still closes at mid so a real flatten is not blocked.
+   * Open the wanted side when flat. An opposite buy or sell leaves the ticket
+   * alone so the stop and take profit can finish the scalp.
+   * Flatten still closes at mid.
    */
   sync(want: PositionSide, mid: number, ts: number): DummyFill[] {
     const fills: DummyFill[] = [];
     const have: PositionSide = this.open?.side ?? "flat";
     if (have === want) return fills;
-    if (this.open && (want === "buy" || want === "sell")) {
-      const minPoints = this.opts.minReversePoints ?? 1;
-      if (!dummyReverseAllowed(this.open.openPrice, mid, minPoints, this.opts.point)) {
-        return fills;
-      }
-    }
+    if (this.open && (want === "buy" || want === "sell")) return fills;
     if (this.open) {
       const closed = this.closeAt(mid, "signal", ts);
       if (closed) fills.push(closed);
