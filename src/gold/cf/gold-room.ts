@@ -16,6 +16,8 @@ export class GoldRoom extends DurableObject<Env> {
   private meta: GoldMeta | null = null;
   private hub: SseHub = createSseHub();
   private mid = 0;
+  private bid = 0;
+  private ask = 0;
   private live = false;
   private lastFetch = 0;
   private intervalMs = 1000;
@@ -93,6 +95,8 @@ export class GoldRoom extends DurableObject<Env> {
     const next = await stepLiveGoldQuote(
       {
         mid: this.mid > 0 ? this.mid : null,
+        bid: this.bid > 0 ? this.bid : null,
+        ask: this.ask > 0 ? this.ask : null,
         live: this.live,
         lastFetch: this.lastFetch,
       },
@@ -100,11 +104,14 @@ export class GoldRoom extends DurableObject<Env> {
       { refreshMs: this.refreshMs },
     );
     this.mid = next.mid ?? 0;
+    this.bid = next.bid ?? 0;
+    this.ask = next.ask ?? 0;
     this.live = next.live;
     this.lastFetch = next.lastFetch;
     await this.ctx.storage.put("mid", this.mid);
     await this.ctx.storage.put("live", this.live);
     if (this.meta) this.meta.feed = feedKindFromLive(this.live);
-    if (this.mid > 0) await trader.onTick(demoTickFromMid(this.mid));
+    if (this.bid > 0 && this.ask >= this.bid) await trader.onTick({ bid: this.bid, ask: this.ask, volume: 1 });
+    else if (this.mid > 0) await trader.onTick(demoTickFromMid(this.mid));
   }
 }

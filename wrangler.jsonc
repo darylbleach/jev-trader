@@ -29,7 +29,8 @@
     "GOLD_SL_POINTS": "100",
     "GOLD_TP_POINTS": "60",
     "GOLD_REVERSE": "true",
-    "XAUUSD_SPOT_URL": "https://api.gold-api.com/price/XAU",
+    "GOLD_MAX_SPREAD_PIPS": "80",
+    "XAUUSD_SPOT_URL": "https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD",
     "XAUUSD_SPOT_REFRESH_MS": "1000",
     "GOLD_MIN_REVERSE_POINTS": "1"
   },
