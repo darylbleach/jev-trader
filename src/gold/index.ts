@@ -2,20 +2,22 @@ import { goldConfig } from "./config";
 import { startFeedPoller } from "./feed";
 import { createGoldModel } from "./model";
 import { startGoldServer } from "./server";
+import { startLiveGoldPoller } from "./spot";
 import { GoldTrader } from "./trader";
-import { seedGoldMid, startDemoWalk } from "./walk";
+import type { GoldFeedKind } from "./types";
 
 const model = createGoldModel();
 const trader = new GoldTrader(model);
-const feed: "demo" | "url" | "idle" = goldConfig.feedUrl ? "url" : goldConfig.demo ? "demo" : "idle";
-const server = startGoldServer(trader, {
+const feed: GoldFeedKind = goldConfig.feedUrl ? "url" : goldConfig.demo ? "live" : "idle";
+const meta = {
   model: model.name,
-  market: "XAUUSD",
+  market: "XAUUSD" as const,
   dryRun: goldConfig.dryRun,
   dummyMt5: goldConfig.dummyMt5,
   startedAt: trader.startedAt,
   feed,
-});
+};
+const server = startGoldServer(trader, meta);
 
 trader.onEvent = (e) => {
   server.broadcast(e);
@@ -35,10 +37,16 @@ trader.onFill = (f) => {
 
 if (goldConfig.feedUrl) {
   startFeedPoller(trader, goldConfig.feedUrl, goldConfig.intervalMs);
+  console.log(`gold feed url ${goldConfig.feedUrl}`);
 } else if (goldConfig.demo) {
-  const seed = await seedGoldMid();
-  startDemoWalk(trader, goldConfig.intervalMs, seed);
-  console.log(`gold demo walk seed ${seed.toFixed(2)}`);
+  startLiveGoldPoller(trader, goldConfig.intervalMs, {
+    refreshMs: goldConfig.spotRefreshMs,
+    onSource: (kind) => {
+      meta.feed = kind;
+      if (kind === "live") console.log(`gold live spot ${goldConfig.spotUrl}`);
+      else console.log("gold live spot unavailable; walking until a quote lands");
+    },
+  });
 }
 
 console.log(`jev-gold model=${model.name} XAUUSD interval ${goldConfig.intervalMs}ms horizon ${goldConfig.horizonMs}ms lot ${goldConfig.lot} sl ${goldConfig.slPoints} tp ${goldConfig.tpPoints} ${goldConfig.dryRun ? "DRY RUN" : "live signals"}${goldConfig.dummyMt5 ? " dummy MT5" : ""} :${server.port} /demo`);

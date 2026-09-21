@@ -15,6 +15,7 @@ function createDummyAccount(): DummyMt5Account | null {
     point: goldConfig.point,
     contractSize: goldConfig.contractSize,
     historySize: goldConfig.historySize,
+    minReversePoints: goldConfig.minReversePoints,
   });
 }
 
@@ -210,6 +211,9 @@ export class GoldTrader {
         this.position = this.apply(this.position, action, goldConfig.reverse);
       }
       this.syncDummy(this.position, mid, now);
+      if (this.dummy) {
+        this.position = this.dummy.openTicket?.side ?? "flat";
+      }
 
       const signal: GoldSignal = {
         ts: now,

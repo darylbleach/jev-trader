@@ -29,7 +29,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
     const url = new URL(request.url);
-    const stub = env.GOLD_ROOM.getByName("xauusd");
+    const stub = env.GOLD_ROOM.getByName("xauusd-jev");
 
     const page = pageResponse(url.pathname);
     if (page) {

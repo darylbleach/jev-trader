@@ -16,8 +16,11 @@ export const GOLD_ENV_KEYS = [
   "GOLD_SL_POINTS",
   "GOLD_TP_POINTS",
   "GOLD_REVERSE",
+  "GOLD_MIN_REVERSE_POINTS",
   "GOLD_CONTRACT_SIZE",
   "XAUUSD_FEED_URL",
+  "XAUUSD_SPOT_URL",
+  "XAUUSD_SPOT_REFRESH_MS",
 ] as const;
 
 export function applyWorkerEnv(env: Record<string, unknown>): void {

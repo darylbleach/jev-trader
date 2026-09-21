@@ -18,8 +18,8 @@
         </div>
         <span class="offline" id="offline"></span>
         <div class="pills">
-          <span class="pill" id="feed">demo</span>
-          <span class="badge" id="model">mock</span>
+          <span class="pill" id="feed">live</span>
+          <span class="badge jev" id="model">jev-latest</span>
         </div>
       </header>
 
@@ -61,7 +61,7 @@
         <div class="right">
           <section class="panel">
             <div class="section-label">STANDING ORDER</div>
-            <p class="order">scalp XAUUSD with small in and out buys and sells. the model answers about once a second. no abstaining.</p>
+            <p class="order">scalp XAUUSD with small in and out buys and sells from the live gold spot. the model answers about once a second. no abstaining.</p>
           </section>
           <section class="panel">
             <div class="section-label">WHICH SIDE THIS TICK?</div>
@@ -89,7 +89,7 @@
         <div class="dummy-head">
           <div>
             <div class="section-label">DUMMY TRADE TAPE</div>
-            <p class="dummy-note" id="dummyNote">Simulated tickets. Not a live broker. Shows what JevLeader would open and close on XAUUSD, with profit or loss on every close.</p>
+            <p class="dummy-note" id="dummyNote">Simulated tickets. Not a live broker. Holds the open ticket while the live mid is unchanged so a flip does not scratch at the same price.</p>
           </div>
           <div class="dummy-record" id="dummyRecord">W 0  L 0</div>
         </div>
@@ -97,7 +97,7 @@
         <div class="tape dummy-tape" id="dummyTape"></div>
       </section>
 
-      <p class="foot">Experimental gold scalp demo. Jev (or the stand-in) decides small in and out buys or sells from the XAUUSD feed. The MT5 dummy tape is simulated so you can see opens and closes without a broker. Live broker fills only happen if you attach the MT5 EAs. Not financial advice.</p>
+      <p class="foot">Experimental gold scalp demo. Jev (or the stand-in) decides small in and out buys or sells from the live XAUUSD spot. The MT5 dummy tape is simulated so you can see opens and closes without a broker. Live broker fills only happen if you attach the MT5 EAs. Not financial advice.</p>
     </div>
     <script type="module" src="./demo.ts"></script>
   </body>
