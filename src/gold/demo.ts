@@ -323,7 +323,13 @@ function renderDummy(): void {
       open.className = "dummy-open";
     } else {
       const t = openTicket;
-      open.innerHTML = `<span class="${t.side}">${t.side.toUpperCase()} in</span> #${t.ticket}  ${t.lots} lot @ ${t.openPrice.toFixed(2)}  SL ${t.sl.toFixed(2)}  TP ${t.tp.toFixed(2)}  open ${money(dummyPnl.floating)}`;
+      open.innerHTML = [
+        `<span class="leg ${t.side}">${t.side.toUpperCase()} in</span>`,
+        `<span class="leg">#${t.ticket} ${t.lots} lot @ ${t.openPrice.toFixed(2)}</span>`,
+        `<span class="leg">SL ${t.sl.toFixed(2)}</span>`,
+        `<span class="leg">TP ${t.tp.toFixed(2)}</span>`,
+        `<span class="leg">open ${money(dummyPnl.floating)}</span>`,
+      ].join("");
       open.className = `dummy-open ${t.side}`;
     }
   }
