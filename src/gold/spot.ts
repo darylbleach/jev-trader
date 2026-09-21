@@ -69,7 +69,10 @@ export async function fetchLiveGoldMid(opts?: {
     try {
       const res = await fetchFn(url, {
         signal: AbortSignal.timeout(timeoutMs),
-        headers: { accept: "application/json" },
+        headers: {
+          accept: "application/json",
+          "user-agent": "jev-gold-demo",
+        },
       });
       if (!res.ok) continue;
       const mid = parseGoldSpotPrice(await res.json());

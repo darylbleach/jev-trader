@@ -834,7 +834,10 @@ async function fetchLiveGoldMid(opts) {
     try {
       const res = await fetchFn(url, {
         signal: AbortSignal.timeout(timeoutMs),
-        headers: { accept: "application/json" }
+        headers: {
+          accept: "application/json",
+          "user-agent": "jev-gold-demo"
+        }
       });
       if (!res.ok) continue;
       const mid = parseGoldSpotPrice(await res.json());
@@ -1206,7 +1209,7 @@ var worker_default = {
   async fetch(request, env2, ctx) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
     const url = new URL(request.url);
-    const stub = env2.GOLD_ROOM.getByName("xauusd");
+    const stub = env2.GOLD_ROOM.getByName("xauusd-live");
     const page = pageResponse(url.pathname);
     if (page) {
       ctx.waitUntil(stub.ensureTicking());
