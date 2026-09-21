@@ -1,5 +1,5 @@
 import { parseTick } from "../state";
-import type { GoldFill, GoldSignal } from "../types";
+import type { GoldFeedKind, GoldFill, GoldSignal } from "../types";
 
 export interface GoldMeta {
   model: string;
@@ -7,7 +7,7 @@ export interface GoldMeta {
   dryRun: boolean;
   dummyMt5?: boolean;
   startedAt: number;
-  feed: "demo" | "url" | "idle";
+  feed: GoldFeedKind;
 }
 
 export interface GoldHttpTrader {
