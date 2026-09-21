@@ -1,9 +1,11 @@
 const env = (key: string, fallback?: string) => process.env[key] ?? fallback;
 
-/** Many XAUUSD brokers quote with SYMBOL_POINT 0.01, so 2000 points is $20 of gold. */
-export const GOLD_DEFAULT_SL_POINTS = 2000;
-/** Slightly wider than SL: 2500 points is $25 of gold at SYMBOL_POINT 0.01. */
-export const GOLD_DEFAULT_TP_POINTS = 2500;
+/** Tight XAUUSD scalp. Many brokers quote SYMBOL_POINT 0.01, so 600 points is $6 of gold. */
+export const GOLD_DEFAULT_SL_POINTS = 600;
+/** Slightly wider than SL so a small winner can clear: 800 points is $8 at SYMBOL_POINT 0.01. */
+export const GOLD_DEFAULT_TP_POINTS = 800;
+/** Short near-term window Jev is asked about. Not a swing hold. */
+export const GOLD_DEFAULT_HORIZON_MS = 6000;
 
 /** Env integers used for SL/TP. Zero, negative, or non-numeric values fall back so exits stay on. */
 export function parsePositiveInt(raw: string | undefined, fallback: number): number {
@@ -16,7 +18,7 @@ export function parsePositiveInt(raw: string | undefined, fallback: number): num
 export const goldConfig = {
   port: Number(env("GOLD_PORT", "3001")),
   intervalMs: Number(env("GOLD_INTERVAL_MS", "1000")),
-  horizonMs: Number(env("GOLD_HORIZON_MS", "30000")),
+  horizonMs: Number(env("GOLD_HORIZON_MS", String(GOLD_DEFAULT_HORIZON_MS))),
   lot: Number(env("GOLD_LOT", "0.01")),
   maxLot: Number(env("GOLD_MAX_LOT", "1")),
   maxSpreadPips: Number(env("GOLD_MAX_SPREAD_PIPS", "30")),

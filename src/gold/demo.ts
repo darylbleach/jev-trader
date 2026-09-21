@@ -33,6 +33,7 @@ interface Snapshot {
   dryRun: boolean;
   feed?: string;
   latest: GoldSignal | null;
+  horizonMs?: number;
   totals: { ticks: number; decisions: number; lateTicks: number; fills: number; jevUsd: number };
   error?: string | null;
   history?: GoldEvent[];
@@ -43,7 +44,13 @@ const $ = (id: string) => document.getElementById(id);
 const mids: number[] = [];
 const tape: GoldSignal[] = [];
 let latest: GoldSignal | null = null;
+let horizonMs: number | null = null;
 let totals = { ticks: 0, decisions: 0, lateTicks: 0, fills: 0, jevUsd: 0 };
+
+function exitLabel(points?: number): string {
+  if (!points) return "-";
+  return `${points} pts ($${(points * 0.01).toFixed(0)})`;
+}
 
 function pct(n: number): string {
   return `${Math.round(n * 100)}%`;
@@ -58,6 +65,7 @@ function applySnapshot(s: Snapshot): void {
   }
   const feed = $("feed");
   if (feed) feed.textContent = s.feed ?? (s.dryRun ? "demo" : "live");
+  if (typeof s.horizonMs === "number" && s.horizonMs > 0) horizonMs = s.horizonMs;
   if (s.totals) totals = s.totals;
   if (s.history) {
     for (const e of s.history) {
@@ -112,9 +120,10 @@ function renderStats(): void {
     ["LATE", String(totals.lateTicks)],
     ["FILLS", String(totals.fills)],
     ["JEV USD", totals.jevUsd.toFixed(4)],
+    ["HORIZON", horizonMs ? `${horizonMs / 1000}s` : "-"],
     ["SPREAD", latest ? `${latest.spreadPips.toFixed(1)} pips` : "-"],
-    ["SL", latest?.slPoints ? `${latest.slPoints} pts` : "-"],
-    ["TP", latest?.tpPoints ? `${latest.tpPoints} pts` : "-"],
+    ["SL", exitLabel(latest?.slPoints)],
+    ["TP", exitLabel(latest?.tpPoints)],
   ];
   el.innerHTML = cells.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 }

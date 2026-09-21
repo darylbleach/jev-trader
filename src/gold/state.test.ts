@@ -32,7 +32,7 @@ test("MidRing builds gold state and blocks a wide spread", () => {
   ring.push(2650.5);
   const state = ring.build({ bid: 2650.0, ask: 2651.0, volume: 3 }, {
     ts: 1,
-    horizonMs: 30_000,
+    horizonMs: 6_000,
     intervalMs: 1000,
     point: 0.01,
     maxSpreadPips: 30,

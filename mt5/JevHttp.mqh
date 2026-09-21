@@ -3,8 +3,8 @@
 
 #include <Trade/Trade.mqh>
 
-#define JEV_DEFAULT_SL_POINTS 2000
-#define JEV_DEFAULT_TP_POINTS 2500
+#define JEV_DEFAULT_SL_POINTS 600
+#define JEV_DEFAULT_TP_POINTS 800
 
 string JevTrim(string s)
 {

@@ -17,18 +17,18 @@ export interface GoldModel {
   decide(state: GoldState): Promise<GoldDecision>;
 }
 
-const QUESTIONS = {
+export const GOLD_QUESTIONS = {
   direction: {
     type: "choice",
     instructions: {
-      question: "Will XAUUSD be higher or lower than the current mid after `horizonMs` milliseconds?",
-      goal: "Trade XAUUSD gold vs USD on a forex broker. Ticks arrive continuously. A decision is made about once per `intervalMs` and held until the next one. The trade is a market order that pays the spread (`spreadPips`) plus typical commission, so the move must beat that cost.",
-      timing: "The order executes as a market order on the next poll from the leader Expert Advisor, usually within a few hundred milliseconds.",
-      inputs: "`returnsPips` and `recentMids` show the path over the horizon. `spreadPips` is the current bid-ask width in pips. `volume` is tick volume on the last print. If `allowed.buy` is false the trade will not buy, and vice versa.",
+      question: "Will XAUUSD print a small move higher or lower than the current mid within `horizonMs` milliseconds?",
+      goal: "Scalp XAUUSD gold vs USD on a forex broker. Take lots of small in and out buys and sells. Aim for a short move that beats the spread (`spreadPips`) plus typical commission. Do not hold for a large trend. Ticks arrive continuously. A decision is made about once per `intervalMs`. An opposite signal closes and flips.",
+      timing: "The order executes as a market order on the next poll from the leader Expert Advisor, usually within a few hundred milliseconds. Tight stop loss and take profit sit on every fill so the scalp can exit without waiting for a big swing.",
+      inputs: "`returnsPips` and `recentMids` show the short path over the scalp horizon. `spreadPips` is the current bid-ask width in pips. `volume` is tick volume on the last print. If `allowed.buy` is false the trade will not buy, and vice versa.",
     },
     criteria: {
-      buy: "Buy gold now: mid more likely to be higher after `horizonMs`, by more than the spread and commission.",
-      sell: "Sell gold now: mid more likely to be lower after `horizonMs`, by more than the spread and commission.",
+      buy: "Buy gold now for a small scalp: mid more likely to be a little higher after `horizonMs`, by more than the spread and commission. Do not wait for a large uptrend.",
+      sell: "Sell gold now for a small scalp: mid more likely to be a little lower after `horizonMs`, by more than the spread and commission. Do not wait for a large downtrend.",
     },
   },
 } as const;
@@ -57,7 +57,7 @@ export class GoldJevModel implements GoldModel {
 
   async decide(state: GoldState): Promise<GoldDecision> {
     const t0 = performance.now();
-    const r = await experimental_evaluate({ model: this.model, state: state as any, questions: QUESTIONS, maxRetries: 0 });
+    const r = await experimental_evaluate({ model: this.model, state: state as any, questions: GOLD_QUESTIONS, maxRetries: 0 });
     const a = r.answers.direction;
     return goldDecisionFromEvaluate(
       a.choice,
