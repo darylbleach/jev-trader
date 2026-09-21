@@ -10,6 +10,21 @@ One decision every Monad block. A TypeSafe Jev model watches the Kuru MON-USDC o
 
 With no `PRIVATE_KEY` it dry-runs: real book, real decisions, simulated fills. Set `MODEL=jev` and `TYPESAFE_AI_API_KEY` to use Jev; the default `mock` is a momentum heuristic stand-in.
 
+## XAUUSD copy trader (separate process)
+
+This does not replace the Monad/Kuru demo. `bun run start` is still MON-USDC on Kuru every block.
+
+    bun run gold
+
+Opens a gold-only process on `GOLD_PORT` (default 3001) with a live demo page at `/` and `/demo`. A built-in XAUUSD walk seeds from a public gold spot and keeps ticking so Jev (or the mock) can decide without MetaTrader. Set `GOLD_MODEL=jev` and `TYPESAFE_AI_API_KEY` to use Jev on gold while leaving the Kuru `MODEL` alone.
+
+- `GET /` or `GET /demo` dashboard
+- `GET /status` snapshot
+- `GET /signal` latest buy/sell for the MT5 EAs
+- `POST /tick` `POST /fill` `GET /events`
+
+To execute on a broker and copy to follower accounts, attach the EAs in `mt5/` (see `mt5/README.md`). That path is a broker CFD, not an on-chain Kuru market.
+
 ## Endpoints
 
 Deployed (dry run, mock model): https://jev-trader-production.up.railway.app
@@ -54,6 +69,8 @@ Live sends are fired and forgotten, so the `block` event carries the **intent**:
     src/model.ts    Model interface, JevModel (AI SDK experimental_evaluate), MockModel
     src/trader.ts   the loop: one in flight, hold when late, position and P&L accounting
     src/server.ts   Bun.serve: snapshot, history, SSE
+    src/gold/       XAUUSD signal process and demo (separate from the Kuru loop)
+    mt5/            JevLeader and JevFollower Expert Advisors
 
 ## The 300 ms budget
 

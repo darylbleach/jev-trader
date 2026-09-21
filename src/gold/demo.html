@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jev Gold</title>
+    <link rel="stylesheet" href="./demo.css" />
+  </head>
+  <body>
+    <div class="card">
+      <header class="header">
+        <span class="brand">Jev Gold</span>
+        <span class="pair">XAUUSD</span>
+        <span class="seq" id="seq">seq -</span>
+        <span class="spacer"></span>
+        <span class="offline" id="offline"></span>
+        <span class="pill" id="feed">demo</span>
+        <span class="badge" id="model">mock</span>
+      </header>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="main">
+        <div class="left">
+          <div class="price-row">
+            <div>
+              <div class="price-label">MID</div>
+              <div class="price" id="mid">-</div>
+            </div>
+            <div class="pos" id="pos">flat</div>
+          </div>
+          <canvas id="chart" width="900" height="280"></canvas>
+        </div>
+        <div class="right">
+          <section class="panel">
+            <div class="section-label">STANDING ORDER</div>
+            <p class="order">post a market buy or sell on XAUUSD. the model answers about once a second. no abstaining.</p>
+          </section>
+          <section class="panel">
+            <div class="section-label">WHICH SIDE THIS TICK?</div>
+            <div class="headline" id="headline">WAIT</div>
+            <div class="bar-row">
+              <span class="bar-label buy">buy</span>
+              <div class="track"><div class="fill buy" id="buyFill"></div></div>
+              <span class="bar-pct" id="buyPct">-</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label sell">sell</span>
+              <div class="track"><div class="fill sell" id="sellFill"></div></div>
+              <span class="bar-pct" id="sellPct">-</span>
+            </div>
+            <div class="latency" id="latency"></div>
+          </section>
+          <section class="tape-wrap">
+            <div class="section-label">DECISIONS</div>
+            <div class="tape" id="tape"></div>
+          </section>
+        </div>
+      </div>
+
+      <p class="foot">Experimental gold demo. Jev (or the stand-in) decides buy or sell from the XAUUSD feed. Broker fills only happen if you attach the MT5 EAs. Not financial advice.</p>
+    </div>
+    <script type="module" src="./demo.ts"></script>
+  </body>
+</html>
