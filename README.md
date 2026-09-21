@@ -16,7 +16,7 @@ This does not replace the Monad/Kuru demo. `bun run start` is still MON-USDC on 
 
     bun run gold
 
-Opens a gold-only process on `GOLD_PORT` (default 3001) with a live demo page at `/` and `/demo`. A built-in XAUUSD walk seeds from a public gold spot and keeps ticking so Jev (or the mock) can decide without MetaTrader. Set `GOLD_MODEL=jev` and `TYPESAFE_AI_API_KEY` to use Jev on gold while leaving the Kuru `MODEL` alone.
+Opens a gold-only process on `GOLD_PORT` (default 3001) with a live demo page at `/` and `/demo`. The demo polls a public XAUUSD spot so Jev (or the mock) decides on live gold without MetaTrader. A random walk is only the fallback if that spot is down. Set `GOLD_MODEL=jev` and `TYPESAFE_AI_API_KEY` to use Jev on gold while leaving the Kuru `MODEL` alone.
 
 - `GET /` or `GET /demo` dashboard
 - `GET /status` snapshot
@@ -29,11 +29,11 @@ This gold process is a small in-out scalp, not a swing hold. Jev is asked about 
 
 Dry-run (default) also simulates JevLeader tickets so the gold page can show what would happen without a broker: market open at mid, reverse close then open, flatten close only, and SL/TP exits when price touches. Open ticket, recent dummy trades, and running P and L are on `GET /status` and the demo page under MT5 dummy (simulated, not a live broker). Dummy fills reuse `POST /fill` internally and the existing SSE `fill` events. Set `GOLD_DUMMY_MT5=false` to turn that off, or `GOLD_DRY_RUN=false` when a real EA posts `/fill`.
 
-To execute on a broker and copy to follower accounts, attach the EAs in `mt5/` (see `mt5/README.md`). That path is a broker CFD, not an on-chain Kuru market.
+To execute on a broker and copy to follower accounts, attach the EAs in `mt5/`. The full MT5 copy-trader guide is `mt5/README.md`. That path is a broker CFD, not an on-chain Kuru market.
 
 ## Cloudflare gold demo (shareable)
 
-Live now: [https://jev-gold-demo.darylbleach.workers.dev](https://jev-gold-demo.darylbleach.workers.dev). That is the XAUUSD page only, not the Kuru MON-USDC bot. Send that link. It fits a phone (stacked cards, no sideways scroll) and a desktop. Workers cron cannot tick every second, so a Durable Object alarm walks the mid once a second while someone is watching. The public deploy defaults to `GOLD_MODEL=mock` so it runs without a TypeSafe key. Jev is optional: put `TYPESAFE_AI_API_KEY` as a Worker secret and set `GOLD_MODEL` to `jev`.
+Live now: [https://jev-gold-demo.darylbleach.workers.dev](https://jev-gold-demo.darylbleach.workers.dev). That is the XAUUSD page only, not the Kuru MON-USDC bot. Send that link. It fits a phone (stacked cards, no sideways scroll) and a desktop. Workers cron cannot tick every second, so a Durable Object alarm pulls the live gold spot once a second while someone is watching. The public deploy runs `GOLD_MODEL=jev` so Jev decides buy or sell from the live XAUUSD spot. Put `TYPESAFE_AI_API_KEY` as a Worker secret only. Never put that key in wrangler vars, git, or the Worker page.
 
 `/` and `/demo` are the dashboard. `/status` `/signal` `/events` `/tick` `/fill` are the same gold API as `bun run gold`.
 
@@ -45,14 +45,13 @@ npx wrangler login
 npx wrangler deploy
 ```
 
-Optional Jev on the hosted demo:
+Hosted Jev needs the TypeSafe secret (never a wrangler var):
 
 ```
 npx wrangler secret put TYPESAFE_AI_API_KEY
-npx wrangler secret put GOLD_MODEL
 ```
 
-When prompted for `GOLD_MODEL`, enter `jev`. Local preview: `npx wrangler dev` then open `http://127.0.0.1:8787`.
+`GOLD_MODEL` is `jev` in wrangler vars. Local preview: `npx wrangler dev` then open `http://127.0.0.1:8787`.
 
 ## Endpoints
 

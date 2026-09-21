@@ -18,7 +18,7 @@
     "run_worker_first": true
   },
   "vars": {
-    "GOLD_MODEL": "mock",
+    "GOLD_MODEL": "jev",
     "MODEL": "mock",
     "GOLD_DEMO": "true",
     "GOLD_DRY_RUN": "true",
@@ -28,7 +28,9 @@
     "GOLD_LOT": "0.01",
     "GOLD_SL_POINTS": "600",
     "GOLD_TP_POINTS": "800",
-    "GOLD_REVERSE": "true"
+    "GOLD_REVERSE": "true",
+    "XAUUSD_SPOT_URL": "https://api.gold-api.com/price/XAU",
+    "XAUUSD_SPOT_REFRESH_MS": "5000"
   },
   "durable_objects": {
     "bindings": [

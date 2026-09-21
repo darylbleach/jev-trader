@@ -2,7 +2,7 @@ import demoPage from "./demo.html";
 import { goldConfig } from "./config";
 import { parseTick } from "./state";
 import type { GoldTrader } from "./trader";
-import type { GoldEvent, GoldFill, GoldSignal } from "./types";
+import type { GoldEvent, GoldFeedKind, GoldFill, GoldSignal } from "./types";
 
 interface Meta {
   model: string;
@@ -10,7 +10,7 @@ interface Meta {
   dryRun: boolean;
   dummyMt5?: boolean;
   startedAt: number;
-  feed: "demo" | "url" | "idle";
+  feed: GoldFeedKind;
 }
 
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS" };
