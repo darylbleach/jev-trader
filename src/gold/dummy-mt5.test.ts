@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { DummyMt5Account, slTpHit, stopPrices, ticketPnl } from "./dummy-mt5";
+import { DummyMt5Account, dummyReverseAllowed, slTpHit, stopPrices, ticketPnl } from "./dummy-mt5";
 import { parseFill } from "./server";
 
 const opts = {
@@ -47,6 +47,25 @@ test("same side sync is a no-op", () => {
   acct.sync("buy", 2650, 1);
   expect(acct.sync("buy", 2651, 2)).toEqual([]);
   expect(acct.openTicket?.openPrice).toBe(2650);
+});
+
+test("dummyReverseAllowed needs at least one point of mid move", () => {
+  expect(dummyReverseAllowed(2650, 2650, 1, 0.01)).toBe(false);
+  expect(dummyReverseAllowed(2650, 2650.005, 1, 0.01)).toBe(false);
+  expect(dummyReverseAllowed(2650, 2650.01, 1, 0.01)).toBe(true);
+  expect(dummyReverseAllowed(2650, 2649.99, 1, 0.01)).toBe(true);
+  expect(dummyReverseAllowed(2650, 2650, 0, 0.01)).toBe(true);
+});
+
+test("reverse at the same mid holds the open ticket", () => {
+  const acct = new DummyMt5Account(opts);
+  acct.sync("buy", 2650, 1);
+  expect(acct.sync("sell", 2650, 2)).toEqual([]);
+  expect(acct.openTicket?.side).toBe("buy");
+  expect(acct.openTicket?.ticket).toBe(1);
+  expect(acct.closedTrades).toHaveLength(0);
+  expect(acct.sync("sell", 2650.005, 3)).toEqual([]);
+  expect(acct.openTicket?.side).toBe("buy");
 });
 
 test("reverse closes the old ticket at mid then opens the other side", () => {

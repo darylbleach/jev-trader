@@ -4,6 +4,7 @@ import type { GoldTrader } from "./trader";
 
 export const GOLD_WALK_FALLBACK_MID = 2650;
 
+/** @deprecated Prefer `seedGoldMid` / `resolveGoldMid` in `./spot`. Kept for the walk fallback. */
 export async function seedGoldMid(): Promise<number> {
   try {
     const res = await fetch("https://api.gold-api.com/price/XAU", { signal: AbortSignal.timeout(4000) });
@@ -12,7 +13,7 @@ export async function seedGoldMid(): Promise<number> {
       if (typeof body.price === "number" && body.price > 100 && body.price < 100_000) return body.price;
     }
   } catch {
-    // demo still runs from the fallback mid
+    // walk still runs from the fallback mid
   }
   return GOLD_WALK_FALLBACK_MID;
 }
@@ -30,7 +31,7 @@ export function demoTickFromMid(mid: number): GoldTick {
   };
 }
 
-/** Random-walk ticks around a seed mid so the demo moves without an EA or vendor feed. */
+/** Last-resort random walk when no live gold spot can be fetched. */
 export function startDemoWalk(trader: GoldTrader, intervalMs: number, seed: number): () => void {
   let mid = seed;
   const step = () => {

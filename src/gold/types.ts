@@ -1,6 +1,9 @@
 import type { GoldAction } from "./model";
 import type { PositionSide } from "./policy";
 
+/** How the gold process is getting a quote. `live` is the public XAU spot. */
+export type GoldFeedKind = "live" | "demo" | "url" | "idle";
+
 export interface GoldSignal {
   ts: number;
   seq: number;
