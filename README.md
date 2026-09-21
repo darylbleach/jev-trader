@@ -16,7 +16,7 @@ This does not replace the Monad/Kuru demo. `bun run start` is still MON-USDC on 
 
     bun run gold
 
-Opens a gold-only process on `GOLD_PORT` (default 3001) with a live demo page at `/` and `/demo`. The demo polls a public XAUUSD spot so Jev (or the mock) decides on live gold without MetaTrader. A random walk is only the fallback if that spot is down. Set `GOLD_MODEL=jev` and `TYPESAFE_AI_API_KEY` to use Jev on gold while leaving the Kuru `MODEL` alone.
+Opens a gold-only process on `GOLD_PORT` (default 3001) with a live demo page at `/` and `/demo`. The demo follows a live XAUUSD bid and ask, so the price ticks the way a broker quote does. A once-a-minute gold print is only a fallback, and a random walk runs only if every quote source is down. Set `GOLD_MODEL=jev` and `TYPESAFE_AI_API_KEY` to use Jev on gold while leaving the Kuru `MODEL` alone.
 
 - `GET /` or `GET /demo` dashboard
 - `GET /status` snapshot

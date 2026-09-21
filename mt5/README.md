@@ -35,7 +35,7 @@ The shareable Cloudflare page at https://jev-gold-demo.darylbleach.workers.dev i
 Used to prove Jev (or the stand-in) can decide on gold without a broker.
 
 - Run `bun run gold` with `GOLD_DEMO=true` (default).
-- The process polls a public XAUUSD spot (`https://api.gold-api.com/price/XAU`, Yahoo GC=F as fallback).
+- The process follows a live XAUUSD bid and ask (Swissquote public book). A printed mid and Yahoo GC=F are fallbacks.
 - The dashboard pill says `live` when that spot is landing.
 - Dummy MT5 tickets open and close on the page so you can see P and L.
 - If the spot is down, the page falls back to a small random walk and the pill says `demo`.
@@ -88,7 +88,7 @@ A signal looks like this (fields that matter to the EAs):
       "ask": 4341.58
     }
 
-`seq` is how the EAs know something new happened. They ignore a repeat of the same `seq` and `action`. `ts` must be fresh (`InpMaxAgeMs`, default 5000). `spreadOk` is false when the quote is too wide (`GOLD_MAX_SPREAD_PIPS`, default 30). Both EAs fail closed on a stale `ts`, a wide spread, or an HTTP error.
+`seq` is how the EAs know something new happened. They ignore a repeat of the same `seq` and `action`. `ts` must be fresh (`InpMaxAgeMs`, default 5000). `spreadOk` is false when the quote is too wide (`GOLD_MAX_SPREAD_PIPS`, default 80). A normal XAUUSD book is often about 30 to 60 pips. Both EAs fail closed on a stale `ts`, a wide spread, or an HTTP error.
 
 `slPoints` / `tpPoints` default to 100 / 60. On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $1.00 stop loss and $0.60 take profit. The take profit is the near exit. The stop is wider so a bounce of about $0.80 does not knock the scalp out. The EAs also raise the distance to `SYMBOL_TRADE_STOPS_LEVEL` so the broker does not reject the order.
 
@@ -98,7 +98,7 @@ Netting-style: one side at a time. The open scalp stays on until its stop or tak
 
 The demo no longer invents a price path after one seed.
 
-1. Every `XAUUSD_SPOT_REFRESH_MS` (default 1s) the process fetches `XAUUSD_SPOT_URL` (default `https://api.gold-api.com/price/XAU`). gold-api serves `Cache-Control: max-age=1`.
+1. Every `XAUUSD_SPOT_REFRESH_MS` (default 1s) the process fetches the live XAUUSD bid and ask. That book reprints many times a minute. A single printed mid is the fallback when the book is down, and that print can sit still for most of a minute.
 2. If that fails, it tries Yahoo COMEX gold futures (`GC=F`) as a fallback.
 3. Jev still answers every `GOLD_INTERVAL_MS` (default 1s) on the last live mid. Spot gold can still sit still between prints. The dummy tape keeps the open scalp until price touches the stop or the take profit.
 4. If a live quote has landed and the next fetch fails, the last live mid is held. No walk.
@@ -176,7 +176,7 @@ Attach `JevLeader` to an XAUUSD / GOLD / XAUUSDm chart on the account that shoul
 | `InpMagic` | `210921` | marks leader tickets. Do not reuse on a follower |
 | `InpSLPoints` | `100` | $1.00 on a 0.01 point gold quote. 0 means "use the signal" |
 | `InpTPPoints` | `60` | $0.60 on a 0.01 point gold quote. 0 means "use the signal" |
-| `InpMaxSpreadPips` | `30` | fail closed if the broker spread is wider |
+| `InpMaxSpreadPips` | `80` | fail closed if the broker spread is wider. A phone quote near 50 pips still trades |
 | `InpMaxAgeMs` | `5000` | fail closed if `/signal` is older than this |
 | `InpTimeoutMs` | `2000` | WebRequest timeout |
 | `InpPollMs` | `200` | POST `/tick` and GET `/signal` |
@@ -208,7 +208,7 @@ Attach `JevFollower` to the same symbol family on each copy account. Many follow
 | `InpMaxLot` | `1.0` | hard cap after scaling |
 | `InpMagic` | `210922` | different from the leader on purpose |
 | `InpSLPoints` / `InpTPPoints` | `100` / `60` | same resolve rule as the leader |
-| `InpMaxSpreadPips` / `InpMaxAgeMs` | `30` / `5000` | same fail-closed rules |
+| `InpMaxSpreadPips` / `InpMaxAgeMs` | `80` / `5000` | same fail-closed rules |
 
 Lot math (same as `scaleLots` in `src/gold/policy.ts`):
 
@@ -281,9 +281,9 @@ They do not retry a missed `seq`. The next new `seq` is the next trade. A brief 
 | `GOLD_SL_POINTS` | `100` | rides on `/signal` |
 | `GOLD_TP_POINTS` | `60` | rides on `/signal` |
 | `GOLD_REVERSE` | `true` | kept on the signal; the open scalp still waits for SL or TP |
-| `GOLD_MAX_SPREAD_PIPS` | `30` | `spreadOk` threshold |
+| `GOLD_MAX_SPREAD_PIPS` | `80` | `spreadOk` threshold. Covers a normal XAUUSD book |
 | `XAUUSD_FEED_URL` | unset | leave unset in production |
-| `XAUUSD_SPOT_URL` | gold-api XAU | demo only |
+| `XAUUSD_SPOT_URL` | live XAUUSD book | demo only. The book is still tried first |
 | `XAUUSD_SPOT_REFRESH_MS` | `1000` | demo only |
 | `GOLD_MIN_REVERSE_POINTS` | `1` | dummy reverse only after mid moves |
 
@@ -304,7 +304,7 @@ They do not retry a missed `seq`. The next new `seq` is the next trade. A brief 
 
 ## Troubleshooting
 
-**Pill says `demo` and mid is near 2650.** The live spot fetch failed. Check outbound HTTPS to `api.gold-api.com`. The page will switch to `live` when a quote lands.
+**Pill says `demo` and the quote is near 2650.** The live book fetch failed. Check outbound HTTPS to the Swissquote XAUUSD book. The page will switch to `live` when a bid and ask land.
 
 **Mid is live but dummy tickets never open.** Dry-run dummy is on by default. Wait for the first decision (`seq` incrementing). If `GOLD_DUMMY_MT5=false`, the dummy tape is hidden on purpose.
 

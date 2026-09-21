@@ -190,10 +190,16 @@ function applySnapshot(s: Snapshot): void {
   drawChart();
 }
 
+function paintQuote(bid: number, ask: number): void {
+  const bidEl = $("bid");
+  const askEl = $("ask");
+  if (bidEl) bidEl.textContent = bid.toFixed(2);
+  if (askEl) askEl.textContent = ask.toFixed(2);
+}
+
 function renderSignal(s: GoldSignal): void {
   latest = s;
-  const mid = $("mid");
-  if (mid) mid.textContent = s.mid.toFixed(2);
+  paintQuote(s.bid, s.ask);
   const seq = $("seq");
   if (seq) seq.textContent = `seq ${s.seq}`;
   const pos = $("pos");
@@ -456,8 +462,7 @@ function onEvent(e: GoldEvent): void {
     dummyPnl.floating = (e.mid - openTicket.openPrice) * dir * 100 * openTicket.lots;
     renderDummy();
   }
-  const mid = $("mid");
-  if (mid && !e.decision) mid.textContent = e.mid.toFixed(2);
+  paintQuote(e.bid, e.ask);
   renderStats();
   drawChart();
 }

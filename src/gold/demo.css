@@ -231,9 +231,16 @@ body {
 
 .price-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
+}
+
+.quote-pair {
+  display: flex;
+  gap: 18px;
+  min-width: 0;
 }
 
 .price-label {
@@ -558,6 +565,14 @@ body {
 
   #chart {
     height: 200px;
+  }
+
+  .quote-pair {
+    gap: 14px;
+  }
+
+  .quote-pair .price {
+    font-size: 28px;
   }
 
   .dummy-tape .row:not(.empty) {

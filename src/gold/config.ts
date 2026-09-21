@@ -25,7 +25,8 @@ export const goldConfig = {
   horizonMs: Number(env("GOLD_HORIZON_MS", String(GOLD_DEFAULT_HORIZON_MS))),
   lot: Number(env("GOLD_LOT", "0.01")),
   maxLot: Number(env("GOLD_MAX_LOT", "1")),
-  maxSpreadPips: Number(env("GOLD_MAX_SPREAD_PIPS", "30")),
+  /** A retail XAUUSD book is often about 30 to 60 pips. 15 was a fake width around a printed mid. */
+  maxSpreadPips: Number(env("GOLD_MAX_SPREAD_PIPS", "80")),
   /** XAUUSD point used to convert a price delta into pips. 0.01 is one pip on a 2-decimal quote. */
   point: Number(env("GOLD_POINT", "0.01")),
   slPoints: parsePositiveInt(env("GOLD_SL_POINTS"), GOLD_DEFAULT_SL_POINTS),
@@ -54,11 +55,11 @@ export const goldConfig = {
    * demo decides on live gold. Set false for production so only JevLeader posts /tick.
    */
   demo: env("GOLD_DEMO", "true") !== "false",
-  /** Public XAUUSD spot used by the built-in live demo poller. */
-  spotUrl: env("XAUUSD_SPOT_URL", "https://api.gold-api.com/price/XAU")!,
+  /** Optional extra spot URL. The live XAUUSD book is always tried first. */
+  spotUrl: env("XAUUSD_SPOT_URL", "https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD")!,
   /**
-   * How often to refresh the live spot. Default matches GOLD_INTERVAL_MS so Jev
-   * sees a quote as fresh as gold-api will serve (Cache-Control max-age is 1s).
+   * How often to refresh the live book. Default matches GOLD_INTERVAL_MS.
+   * The book itself reprints many times a minute, unlike a once-a-minute mid print.
    */
   spotRefreshMs: Number(env("XAUUSD_SPOT_REFRESH_MS", "1000")),
   historySize: 1000,

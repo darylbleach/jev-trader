@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { GoldDecision, GoldModel } from "./model";
-import { feedKindFromLive, parseGoldSpotPrice, resolveGoldMid, startLiveGoldPoller, stepLiveGoldQuote } from "./spot";
+import { feedKindFromLive, parseGoldSpotPrice, parseGoldSpotQuote, resolveGoldMid, startLiveGoldPoller, stepLiveGoldQuote } from "./spot";
 import type { GoldState } from "./state";
 import { GoldTrader } from "./trader";
 
@@ -16,10 +16,34 @@ class FixedModel implements GoldModel {
   }
 }
 
+const swissBook = [
+  {
+    topo: { platform: "AT", server: "AT" },
+    spreadProfilePrices: [{ spreadProfile: "standard", bid: 100, ask: 200 }],
+  },
+  {
+    topo: { platform: "SwissquoteLtd", server: "Live5" },
+    spreadProfilePrices: [
+      { spreadProfile: "premium", bid: 4348.1, ask: 4348.9 },
+      { spreadProfile: "elite", bid: 4348.2, ask: 4348.7 },
+    ],
+  },
+];
+
+test("parseGoldSpotQuote prefers the Swissquote elite bid and ask", () => {
+  const quote = parseGoldSpotQuote(swissBook);
+  expect(quote?.book).toBe(true);
+  expect(quote?.bid).toBeCloseTo(4348.2);
+  expect(quote?.ask).toBeCloseTo(4348.7);
+  expect(quote?.mid).toBeCloseTo(4348.45);
+});
+
 test("parseGoldSpotPrice reads gold-api, mid/bid-ask, and yahoo chart", () => {
   expect(parseGoldSpotPrice({ price: 4341.5, symbol: "XAU" })).toBe(4341.5);
+  expect(parseGoldSpotQuote({ price: 4341.5 })?.book).toBe(false);
   expect(parseGoldSpotPrice({ mid: 4340 })).toBe(4340);
   expect(parseGoldSpotPrice({ bid: 4340, ask: 4342 })).toBe(4341);
+  expect(parseGoldSpotQuote({ bid: 4340, ask: 4342 })?.book).toBe(true);
   expect(parseGoldSpotPrice({
     chart: { result: [{ meta: { regularMarketPrice: 4330 } }] },
   })).toBe(4330);
@@ -43,6 +67,24 @@ test("resolveGoldMid walks only when no live quote has landed", async () => {
   expect(next.live).toBe(false);
   expect(next.mid).toBeGreaterThanOrEqual(100);
   expect(next.mid).toBeLessThan(2700);
+});
+
+test("resolveGoldMid prefers a live book over an earlier printed mid", async () => {
+  const fetchFn: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("gold-api")) {
+      return new Response(JSON.stringify({ price: 4400 }), { status: 200 });
+    }
+    return new Response(JSON.stringify(swissBook), { status: 200 });
+  };
+  const next = await resolveGoldMid(
+    { mid: 4300, live: true },
+    { fetch: fetchFn, urls: ["https://api.gold-api.com/price/XAU", "https://forex-data-feed.swissquote.com/xau"] },
+  );
+  expect(next.live).toBe(true);
+  expect(next.bid).toBeCloseTo(4348.2);
+  expect(next.ask).toBeCloseTo(4348.7);
+  expect(next.mid).toBeCloseTo(4348.45);
 });
 
 test("resolveGoldMid prefers a fresh live spot over a held mid", async () => {
