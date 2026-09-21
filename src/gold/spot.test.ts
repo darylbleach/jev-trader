@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { GoldDecision, GoldModel } from "./model";
-import { feedKindFromLive, parseGoldSpotPrice, resolveGoldMid, startLiveGoldPoller } from "./spot";
+import { feedKindFromLive, parseGoldSpotPrice, resolveGoldMid, startLiveGoldPoller, stepLiveGoldQuote } from "./spot";
 import type { GoldState } from "./state";
 import { GoldTrader } from "./trader";
 
@@ -54,6 +54,41 @@ test("resolveGoldMid prefers a fresh live spot over a held mid", async () => {
   const next = await resolveGoldMid({ mid: 4341.5, live: true }, { fetch: ok, urls: ["https://spot.test/xau"] });
   expect(next.live).toBe(true);
   expect(next.mid).toBe(4350.1);
+});
+
+test("stepLiveGoldQuote holds a fresh live mid until refreshMs elapses", async () => {
+  let hits = 0;
+  const fetchFn: typeof fetch = async () => {
+    hits += 1;
+    return new Response(JSON.stringify({ price: 4341 + hits }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  const first = await stepLiveGoldQuote(
+    { mid: null, live: false, lastFetch: 0 },
+    1_000,
+    { fetch: fetchFn, refreshMs: 1000, urls: ["https://spot.test/xau"] },
+  );
+  expect(first.live).toBe(true);
+  expect(first.mid).toBe(4342);
+  expect(hits).toBe(1);
+  const held = await stepLiveGoldQuote(first, 1_500, {
+    fetch: fetchFn,
+    refreshMs: 1000,
+    urls: ["https://spot.test/xau"],
+  });
+  expect(held.mid).toBe(4342);
+  expect(held.lastFetch).toBe(1_000);
+  expect(hits).toBe(1);
+  const refreshed = await stepLiveGoldQuote(held, 2_000, {
+    fetch: fetchFn,
+    refreshMs: 1000,
+    urls: ["https://spot.test/xau"],
+  });
+  expect(refreshed.mid).toBe(4343);
+  expect(refreshed.lastFetch).toBe(2_000);
+  expect(hits).toBe(2);
 });
 
 test("startLiveGoldPoller posts a live tick the model can decide on", async () => {

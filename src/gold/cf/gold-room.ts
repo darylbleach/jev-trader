@@ -6,7 +6,8 @@ const IDLE_MS = 15 * 60_000;
 
 /**
  * One shared XAUUSD demo room so every viewer sees the same tape.
- * A Durable Object alarm pulls the live gold spot every GOLD_INTERVAL_MS (1s).
+ * Boots the same GoldTrader / DummyMt5 / createGoldModel path as `bun run gold`.
+ * A Durable Object alarm calls stepLiveGoldQuote every GOLD_INTERVAL_MS (1s).
  * Cron cannot do that: Workers cron is once a minute at best.
  * GOLD_MODEL=jev boots GoldJevModel via createGoldModel after applyWorkerEnv.
  */
@@ -22,7 +23,7 @@ export class GoldRoom extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    applyWorkerEnv(this.env as unknown as Record<string, unknown>);
+    applyWorkerEnv(this.env);
   }
 
   async ensureTicking(): Promise<void> {
@@ -55,7 +56,7 @@ export class GoldRoom extends DurableObject<Env> {
   }
 
   private async boot(): Promise<GoldHttpTrader> {
-    applyWorkerEnv(this.env as unknown as Record<string, unknown>);
+    applyWorkerEnv(this.env);
     if (this.trader && this.meta) return this.trader;
     const { goldConfig } = await import("../config");
     const { GoldTrader } = await import("../trader");
@@ -68,7 +69,7 @@ export class GoldRoom extends DurableObject<Env> {
       model: model.name,
       market: "XAUUSD",
       dryRun: goldConfig.dryRun,
-      dummyMt5: (goldConfig as { dummyMt5?: boolean }).dummyMt5,
+      dummyMt5: goldConfig.dummyMt5,
       startedAt: trader.startedAt,
       feed: "live",
     };
@@ -87,26 +88,23 @@ export class GoldRoom extends DurableObject<Env> {
   }
 
   private async stepLiveTick(trader: GoldHttpTrader): Promise<void> {
-    const { resolveGoldMid } = await import("../spot");
+    const { feedKindFromLive, stepLiveGoldQuote } = await import("../spot");
     const { demoTickFromMid } = await import("../walk");
-    const now = Date.now();
-    const stale = now - this.lastFetch >= this.refreshMs || this.mid <= 0;
-    if (stale) {
-      this.lastFetch = now;
-      const next = await resolveGoldMid({
+    const next = await stepLiveGoldQuote(
+      {
         mid: this.mid > 0 ? this.mid : null,
         live: this.live,
-      });
-      this.mid = next.mid;
-      this.live = next.live;
-      await this.ctx.storage.put("mid", this.mid);
-      await this.ctx.storage.put("live", this.live);
-    } else if (!this.live && this.mid > 0) {
-      const { nextDemoMid } = await import("../walk");
-      this.mid = nextDemoMid(this.mid);
-      await this.ctx.storage.put("mid", this.mid);
-    }
-    if (this.meta) this.meta.feed = this.live ? "live" : "demo";
+        lastFetch: this.lastFetch,
+      },
+      Date.now(),
+      { refreshMs: this.refreshMs },
+    );
+    this.mid = next.mid ?? 0;
+    this.live = next.live;
+    this.lastFetch = next.lastFetch;
+    await this.ctx.storage.put("mid", this.mid);
+    await this.ctx.storage.put("live", this.live);
+    if (this.meta) this.meta.feed = feedKindFromLive(this.live);
     if (this.mid > 0) await trader.onTick(demoTickFromMid(this.mid));
   }
 }

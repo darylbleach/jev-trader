@@ -23,10 +23,10 @@ export const GOLD_ENV_KEYS = [
   "XAUUSD_SPOT_REFRESH_MS",
 ] as const;
 
-export function applyWorkerEnv(env: Record<string, unknown>): void {
+export function applyWorkerEnv(env: object): void {
   if (typeof process === "undefined" || !process.env) return;
   for (const key of GOLD_ENV_KEYS) {
-    const value = env[key];
+    const value = Reflect.get(env, key);
     if (typeof value === "string") process.env[key] = value;
   }
 }

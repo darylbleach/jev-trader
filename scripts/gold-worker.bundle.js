@@ -18576,7 +18576,8 @@ __export(spot_exports, {
   parseGoldSpotPrice: () => parseGoldSpotPrice,
   resolveGoldMid: () => resolveGoldMid,
   seedGoldMid: () => seedGoldMid2,
-  startLiveGoldPoller: () => startLiveGoldPoller
+  startLiveGoldPoller: () => startLiveGoldPoller,
+  stepLiveGoldQuote: () => stepLiveGoldQuote
 });
 function isGoldMid(n) {
   return typeof n === "number" && Number.isFinite(n) && n > 100 && n < 1e5;
@@ -18643,28 +18644,40 @@ function feedKindFromLive(live, fallback = "demo") {
 async function seedGoldMid2(opts) {
   return await fetchLiveGoldMid(opts) ?? GOLD_WALK_FALLBACK_MID;
 }
+async function stepLiveGoldQuote(clock, now, opts) {
+  const refreshMs = opts?.refreshMs && opts.refreshMs > 0 ? opts.refreshMs : goldConfig.spotRefreshMs;
+  const missing = clock.mid === null || clock.mid <= 0;
+  const stale = now - clock.lastFetch >= refreshMs || missing;
+  if (stale) {
+    const next = await resolveGoldMid(
+      { mid: missing ? null : clock.mid, live: clock.live },
+      { fetch: opts?.fetch, urls: opts?.urls }
+    );
+    return { mid: next.mid, live: next.live, lastFetch: now };
+  }
+  if (!clock.live && clock.mid !== null) {
+    return { mid: nextDemoMid(clock.mid), live: false, lastFetch: clock.lastFetch };
+  }
+  return clock;
+}
 function startLiveGoldPoller(trader, intervalMs, opts) {
   const refreshMs = opts?.refreshMs && opts.refreshMs > 0 ? opts.refreshMs : goldConfig.spotRefreshMs;
   let stopped = false;
-  let state = { mid: null, live: false };
-  let lastFetch = 0;
+  let clock = { mid: null, live: false, lastFetch: 0 };
   let lastKind = null;
   const step = /* @__PURE__ */ __name(async () => {
     if (stopped) return;
-    const now = Date.now();
-    const stale = now - lastFetch >= refreshMs || state.mid === null;
-    if (stale) {
-      lastFetch = now;
-      state = await resolveGoldMid(state, { fetch: opts?.fetch, urls: opts?.urls });
-    } else if (!state.live && state.mid !== null) {
-      state = { mid: nextDemoMid(state.mid), live: false };
-    }
-    const kind = feedKindFromLive(state.live);
+    clock = await stepLiveGoldQuote(clock, Date.now(), {
+      fetch: opts?.fetch,
+      urls: opts?.urls,
+      refreshMs
+    });
+    const kind = feedKindFromLive(clock.live);
     if (kind !== lastKind) {
       lastKind = kind;
       opts?.onSource?.(kind);
     }
-    if (state.mid !== null) await trader.onTick(demoTickFromMid(state.mid));
+    if (clock.mid !== null) await trader.onTick(demoTickFromMid(clock.mid));
   }, "step");
   const id = setInterval(() => {
     void step();
@@ -18690,6 +18703,7 @@ var init_spot = __esm({
     __name(resolveGoldMid, "resolveGoldMid");
     __name(feedKindFromLive, "feedKindFromLive");
     __name(seedGoldMid2, "seedGoldMid");
+    __name(stepLiveGoldQuote, "stepLiveGoldQuote");
     __name(startLiveGoldPoller, "startLiveGoldPoller");
   }
 });
@@ -18724,7 +18738,7 @@ var GOLD_ENV_KEYS = [
 function applyWorkerEnv(env2) {
   if (typeof process === "undefined" || !process.env) return;
   for (const key of GOLD_ENV_KEYS) {
-    const value = env2[key];
+    const value = Reflect.get(env2, key);
     if (typeof value === "string") process.env[key] = value;
   }
 }
@@ -18941,26 +18955,23 @@ var GoldRoom = class extends DurableObject {
     return trader;
   }
   async stepLiveTick(trader) {
-    const { resolveGoldMid: resolveGoldMid2 } = await Promise.resolve().then(() => (init_spot(), spot_exports));
+    const { feedKindFromLive: feedKindFromLive2, stepLiveGoldQuote: stepLiveGoldQuote2 } = await Promise.resolve().then(() => (init_spot(), spot_exports));
     const { demoTickFromMid: demoTickFromMid2 } = await Promise.resolve().then(() => (init_walk(), walk_exports));
-    const now = Date.now();
-    const stale = now - this.lastFetch >= this.refreshMs || this.mid <= 0;
-    if (stale) {
-      this.lastFetch = now;
-      const next = await resolveGoldMid2({
+    const next = await stepLiveGoldQuote2(
+      {
         mid: this.mid > 0 ? this.mid : null,
-        live: this.live
-      });
-      this.mid = next.mid;
-      this.live = next.live;
-      await this.ctx.storage.put("mid", this.mid);
-      await this.ctx.storage.put("live", this.live);
-    } else if (!this.live && this.mid > 0) {
-      const { nextDemoMid: nextDemoMid2 } = await Promise.resolve().then(() => (init_walk(), walk_exports));
-      this.mid = nextDemoMid2(this.mid);
-      await this.ctx.storage.put("mid", this.mid);
-    }
-    if (this.meta) this.meta.feed = this.live ? "live" : "demo";
+        live: this.live,
+        lastFetch: this.lastFetch
+      },
+      Date.now(),
+      { refreshMs: this.refreshMs }
+    );
+    this.mid = next.mid ?? 0;
+    this.live = next.live;
+    this.lastFetch = next.lastFetch;
+    await this.ctx.storage.put("mid", this.mid);
+    await this.ctx.storage.put("live", this.live);
+    if (this.meta) this.meta.feed = feedKindFromLive2(this.live);
     if (this.mid > 0) await trader.onTick(demoTickFromMid2(this.mid));
   }
 };

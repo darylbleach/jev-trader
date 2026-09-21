@@ -12,6 +12,11 @@ export interface LiveGoldState {
   live: boolean;
 }
 
+/** Clock the 1s poller and the Cloudflare GoldRoom alarm share. */
+export interface LiveGoldClock extends LiveGoldState {
+  lastFetch: number;
+}
+
 export type SpotFetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 function isGoldMid(n: unknown): n is number {
@@ -107,6 +112,31 @@ export async function seedGoldMid(opts?: { fetch?: SpotFetch; urls?: string[] })
   return (await fetchLiveGoldMid(opts)) ?? GOLD_WALK_FALLBACK_MID;
 }
 
+/**
+ * One refresh / hold / walk step. Local `bun run gold` and GoldRoom both call this
+ * so Cloudflare cannot keep a leftover walk-only or 5s-stale policy.
+ */
+export async function stepLiveGoldQuote(
+  clock: LiveGoldClock,
+  now: number,
+  opts?: { fetch?: SpotFetch; urls?: string[]; refreshMs?: number },
+): Promise<LiveGoldClock> {
+  const refreshMs = opts?.refreshMs && opts.refreshMs > 0 ? opts.refreshMs : goldConfig.spotRefreshMs;
+  const missing = clock.mid === null || clock.mid <= 0;
+  const stale = now - clock.lastFetch >= refreshMs || missing;
+  if (stale) {
+    const next = await resolveGoldMid(
+      { mid: missing ? null : clock.mid, live: clock.live },
+      { fetch: opts?.fetch, urls: opts?.urls },
+    );
+    return { mid: next.mid, live: next.live, lastFetch: now };
+  }
+  if (!clock.live && clock.mid !== null) {
+    return { mid: nextDemoMid(clock.mid), live: false, lastFetch: clock.lastFetch };
+  }
+  return clock;
+}
+
 export function startLiveGoldPoller(
   trader: GoldTrader,
   intervalMs: number,
@@ -119,26 +149,22 @@ export function startLiveGoldPoller(
 ): () => void {
   const refreshMs = opts?.refreshMs && opts.refreshMs > 0 ? opts.refreshMs : goldConfig.spotRefreshMs;
   let stopped = false;
-  let state: LiveGoldState = { mid: null, live: false };
-  let lastFetch = 0;
+  let clock: LiveGoldClock = { mid: null, live: false, lastFetch: 0 };
   let lastKind: GoldFeedKind | null = null;
 
   const step = async () => {
     if (stopped) return;
-    const now = Date.now();
-    const stale = now - lastFetch >= refreshMs || state.mid === null;
-    if (stale) {
-      lastFetch = now;
-      state = await resolveGoldMid(state, { fetch: opts?.fetch, urls: opts?.urls });
-    } else if (!state.live && state.mid !== null) {
-      state = { mid: nextDemoMid(state.mid), live: false };
-    }
-    const kind = feedKindFromLive(state.live);
+    clock = await stepLiveGoldQuote(clock, Date.now(), {
+      fetch: opts?.fetch,
+      urls: opts?.urls,
+      refreshMs,
+    });
+    const kind = feedKindFromLive(clock.live);
     if (kind !== lastKind) {
       lastKind = kind;
       opts?.onSource?.(kind);
     }
-    if (state.mid !== null) await trader.onTick(demoTickFromMid(state.mid));
+    if (clock.mid !== null) await trader.onTick(demoTickFromMid(clock.mid));
   };
 
   const id = setInterval(() => {
