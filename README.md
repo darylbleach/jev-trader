@@ -27,6 +27,8 @@ This gold process is a small in-out scalp, not a swing hold. Jev is asked about 
 
 `GET /signal` always includes `slPoints` and `tpPoints` (defaults 600 and 800, or `GOLD_SL_POINTS` / `GOLD_TP_POINTS`). On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $6 stop loss and $8 take profit, well above a typical ~15 pip / $0.15 spread. The MT5 EAs attach both on every new gold market order so each scalp can exit.
 
+Dry-run (default) also simulates JevLeader tickets so the gold page can show what would happen without a broker: market open at mid, reverse close then open, flatten close only, and SL/TP exits when price touches. Open ticket, recent dummy trades, and running P and L are on `GET /status` and the demo page under MT5 dummy (simulated, not a live broker). Dummy fills reuse `POST /fill` internally and the existing SSE `fill` events. Set `GOLD_DUMMY_MT5=false` to turn that off, or `GOLD_DRY_RUN=false` when a real EA posts `/fill`.
+
 To execute on a broker and copy to follower accounts, attach the EAs in `mt5/` (see `mt5/README.md`). That path is a broker CFD, not an on-chain Kuru market.
 
 ## Endpoints

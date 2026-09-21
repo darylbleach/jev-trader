@@ -18,33 +18,100 @@ interface GoldSignal {
   position: "buy" | "sell" | "flat";
 }
 
+interface DummyPnL {
+  realizedUsd: number;
+  unrealizedUsd: number;
+  totalUsd: number;
+  wins: number;
+  losses: number;
+}
+
 interface GoldEvent {
   ts: number;
   mid: number;
   bid: number;
   ask: number;
   decision: GoldSignal | null;
+  fill?: GoldFill | null;
   late: boolean;
+  pnl?: DummyPnL;
+  lastTicket?: DummyTrade | null;
+}
+
+interface DummyTicket {
+  ticket: number;
+  side: "buy" | "sell";
+  lots: number;
+  openPrice: number;
+  sl: number;
+  tp: number;
+  openTs: number;
+}
+
+interface DummyTrade {
+  ticket: number;
+  side: "buy" | "sell";
+  lots: number;
+  openPrice: number;
+  sl: number;
+  tp: number;
+  closePrice: number;
+  reason: "signal" | "sl" | "tp";
+  pnl: number;
+  openTs: number;
+  closeTs: number;
+}
+
+interface GoldFill {
+  ticket: number | string;
+  side: "buy" | "sell";
+  lots: number;
+  price: number;
+  kind?: "open" | "close";
+  openPrice?: number;
+  closePrice?: number;
+  sl?: number;
+  tp?: number;
+  reason?: "signal" | "sl" | "tp";
+  pnl?: number;
+  simulated?: boolean;
+  ts?: number;
 }
 
 interface Snapshot {
   model: string;
   market: "XAUUSD";
   dryRun: boolean;
+  dummyMt5?: boolean;
   feed?: string;
   latest: GoldSignal | null;
   horizonMs?: number;
   totals: { ticks: number; decisions: number; lateTicks: number; fills: number; jevUsd: number };
   error?: string | null;
   history?: GoldEvent[];
+  openTicket?: DummyTicket | null;
+  dummyTrades?: DummyTrade[];
+  dummyPnl?: {
+    realized?: number;
+    floating?: number;
+    realizedUsd?: number;
+    unrealizedUsd?: number;
+  };
 }
 
 const $ = (id: string) => document.getElementById(id);
 
 const mids: number[] = [];
 const tape: GoldSignal[] = [];
+const dummyTape: DummyTrade[] = [];
+const seenFills = new Set<string>();
 let latest: GoldSignal | null = null;
 let horizonMs: number | null = null;
+let latestMid = 0;
+let dummyEnabled = true;
+let openTicket: DummyTicket | null = null;
+let lastTicket: DummyTrade | null = null;
+let dummyPnl = { realized: 0, floating: 0, wins: 0, losses: 0 };
 let totals = { ticks: 0, decisions: 0, lateTicks: 0, fills: 0, jevUsd: 0 };
 
 function exitLabel(points?: number): string {
@@ -67,18 +134,35 @@ function applySnapshot(s: Snapshot): void {
   if (feed) feed.textContent = s.feed ?? (s.dryRun ? "demo" : "live");
   if (typeof s.horizonMs === "number" && s.horizonMs > 0) horizonMs = s.horizonMs;
   if (s.totals) totals = s.totals;
+  dummyEnabled = s.dummyMt5 !== false;
+  if (s.openTicket !== undefined) openTicket = s.openTicket;
+  if (s.dummyTrades) {
+    dummyTape.length = 0;
+    dummyTape.push(...s.dummyTrades);
+  }
+  if (s.dummyPnl) {
+    dummyPnl = {
+      realized: s.dummyPnl.realized ?? s.dummyPnl.realizedUsd ?? 0,
+      floating: s.dummyPnl.floating ?? s.dummyPnl.unrealizedUsd ?? 0,
+    };
+  }
   if (s.history) {
     for (const e of s.history) {
       mids.push(e.mid);
+      latestMid = e.mid;
       if (e.decision && !e.late) tape.push(e.decision);
     }
     if (mids.length > 240) mids.splice(0, mids.length - 240);
     if (tape.length > 12) tape.splice(0, tape.length - 12);
   }
-  if (s.latest) renderSignal(s.latest);
+  if (s.latest) {
+    latestMid = s.latest.mid;
+    renderSignal(s.latest);
+  }
   const err = $("offline");
   if (err) err.textContent = s.error ? s.error : "";
   renderStats();
+  renderDummy();
   drawChart();
 }
 
@@ -124,8 +208,96 @@ function renderStats(): void {
     ["SPREAD", latest ? `${latest.spreadPips.toFixed(1)} pips` : "-"],
     ["SL", exitLabel(latest?.slPoints)],
     ["TP", exitLabel(latest?.tpPoints)],
+    ["DUMMY PNL", money(dummyPnl.realized + dummyPnl.floating)],
   ];
   el.innerHTML = cells.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+}
+
+function money(n: number): string {
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${n.toFixed(2)}`;
+}
+
+function renderDummy(): void {
+  const panel = $("dummyPanel");
+  if (panel) panel.style.display = dummyEnabled ? "" : "none";
+  const note = $("dummyNote");
+  if (note) {
+    note.textContent = dummyEnabled
+      ? "Simulated tickets. Not a live broker. Shows what JevLeader would open and close on XAUUSD."
+      : "Dummy MT5 is off. Attach the real EAs to see broker fills.";
+  }
+  const open = $("dummyOpen");
+  if (open) {
+    if (!openTicket) {
+      open.textContent = dummyTape.length ? "no open ticket" : "waiting for first ticket";
+      open.className = "dummy-open";
+    } else {
+      const t = openTicket;
+      open.innerHTML = `<span class="${t.side}">${t.side.toUpperCase()} in</span> #${t.ticket}  ${t.lots} lot @ ${t.openPrice.toFixed(2)}  SL ${t.sl.toFixed(2)}  TP ${t.tp.toFixed(2)}`;
+      open.className = `dummy-open ${t.side}`;
+    }
+  }
+  const pnlEl = $("dummyPnlValue");
+  if (pnlEl) {
+    const total = dummyPnl.realized + dummyPnl.floating;
+    pnlEl.textContent = `${money(total)}  (open ${money(dummyPnl.floating)})`;
+    pnlEl.className = `v ${total > 0 ? "up" : total < 0 ? "down" : ""}`;
+  }
+  const tapeEl = $("dummyTape");
+  if (!tapeEl) return;
+  const rows = [...dummyTape].reverse().slice(0, 16).map((t) => {
+    const verb = t.reason === "sl" ? "SL" : t.reason === "tp" ? "TP" : "CLOSE";
+    return `<div class="row"><span>#${t.ticket}</span><span class="${t.side}">${t.side.toUpperCase()} in</span><span>${t.openPrice.toFixed(2)}</span><span class="${t.reason}">${verb} ${t.closePrice.toFixed(2)}</span><span class="${t.pnl >= 0 ? "up" : "down"}">${money(t.pnl)}</span></div>`;
+  });
+  tapeEl.innerHTML = rows.join("") || `<div class="row"><span></span><span></span><span>no dummy trades yet</span><span></span><span></span></div>`;
+}
+
+function fillKey(f: GoldFill): string {
+  return `${f.ticket}|${f.kind ?? ""}|${f.price}|${f.reason ?? ""}|${f.ts ?? ""}`;
+}
+
+function onFill(f: GoldFill): void {
+  const key = fillKey(f);
+  if (seenFills.has(key)) return;
+  seenFills.add(key);
+  totals.fills += 1;
+  if (f.kind === "open") {
+    openTicket = {
+      ticket: typeof f.ticket === "number" ? f.ticket : Number(f.ticket),
+      side: f.side,
+      lots: f.lots,
+      openPrice: f.openPrice ?? f.price,
+      sl: f.sl ?? 0,
+      tp: f.tp ?? 0,
+      openTs: f.ts ?? Date.now(),
+    };
+  } else if (f.kind === "close" || f.reason) {
+    const trade: DummyTrade = {
+      ticket: typeof f.ticket === "number" ? f.ticket : Number(f.ticket),
+      side: f.side,
+      lots: f.lots,
+      openPrice: f.openPrice ?? openTicket?.openPrice ?? f.price,
+      sl: f.sl ?? openTicket?.sl ?? 0,
+      tp: f.tp ?? openTicket?.tp ?? 0,
+      closePrice: f.closePrice ?? f.price,
+      reason: f.reason ?? "signal",
+      pnl: f.pnl ?? 0,
+      openTs: openTicket?.openTs ?? f.ts ?? Date.now(),
+      closeTs: f.ts ?? Date.now(),
+    };
+    dummyTape.push(trade);
+    if (dummyTape.length > 40) dummyTape.shift();
+    dummyPnl.realized += trade.pnl;
+    dummyPnl.floating = 0;
+    openTicket = null;
+  }
+  if (openTicket && latestMid) {
+    const dir = openTicket.side === "buy" ? 1 : -1;
+    dummyPnl.floating = (latestMid - openTicket.openPrice) * dir * 100 * openTicket.lots;
+  }
+  renderDummy();
+  renderStats();
 }
 
 function renderTape(): void {
@@ -169,15 +341,22 @@ function drawChart(): void {
 
 function onEvent(e: GoldEvent): void {
   mids.push(e.mid);
+  latestMid = e.mid;
   if (mids.length > 240) mids.shift();
-  totals.ticks += 1;
+  if (!e.fill) totals.ticks += 1;
   if (e.late) totals.lateTicks += 1;
-  if (e.decision && !e.late) {
+  if (e.decision && !e.late && !e.fill) {
     totals.decisions += 1;
     tape.push(e.decision);
     if (tape.length > 24) tape.shift();
     renderSignal(e.decision);
     renderTape();
+  }
+  if (e.fill) onFill(e.fill);
+  else if (openTicket) {
+    const dir = openTicket.side === "buy" ? 1 : -1;
+    dummyPnl.floating = (e.mid - openTicket.openPrice) * dir * 100 * openTicket.lots;
+    renderDummy();
   }
   const mid = $("mid");
   if (mid && !e.decision) mid.textContent = e.mid.toFixed(2);
@@ -195,6 +374,15 @@ function connect(): void {
   });
   es.addEventListener("tick", (ev) => onEvent(JSON.parse((ev as MessageEvent).data) as GoldEvent));
   es.addEventListener("late", (ev) => onEvent(JSON.parse((ev as MessageEvent).data) as GoldEvent));
+  es.addEventListener("fill", (ev) => {
+    const data = JSON.parse((ev as MessageEvent).data) as GoldEvent | GoldFill;
+    if (data && typeof data === "object" && "fill" in data && data.fill) {
+      latestMid = typeof data.mid === "number" ? data.mid : latestMid;
+      onFill(data.fill);
+      return;
+    }
+    if (data && typeof data === "object" && "ticket" in data && "side" in data) onFill(data as GoldFill);
+  });
   es.addEventListener("signal", (ev) => {
     const s = JSON.parse((ev as MessageEvent).data) as GoldSignal;
     renderSignal(s);

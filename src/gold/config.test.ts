@@ -26,6 +26,12 @@ test("goldConfig exposes non-zero SL and TP points", () => {
   expect(goldConfig.tpPoints).toBeGreaterThan(0);
 });
 
+test("dummy MT5 is on by default in dry-run", () => {
+  expect(goldConfig.dryRun).toBe(true);
+  expect(goldConfig.dummyMt5).toBe(true);
+  expect(goldConfig.contractSize).toBe(100);
+});
+
 test("parsePositiveInt keeps valid points and falls back on zero or junk", () => {
   expect(parsePositiveInt(undefined, 2000)).toBe(2000);
   expect(parsePositiveInt("", 2000)).toBe(2000);

@@ -8,6 +8,7 @@ interface Meta {
   model: string;
   market: "XAUUSD";
   dryRun: boolean;
+  dummyMt5?: boolean;
   startedAt: number;
   feed: "demo" | "url" | "idle";
 }
@@ -77,7 +78,7 @@ export function startGoldServer(trader: GoldTrader, meta: Meta) {
   };
 }
 
-function parseFill(body: unknown): GoldFill | null {
+export function parseFill(body: unknown): GoldFill | null {
   if (!body || typeof body !== "object") return null;
   const o = body as Record<string, unknown>;
   const ticket = o.ticket;
@@ -85,12 +86,30 @@ function parseFill(body: unknown): GoldFill | null {
   const lots = typeof o.lots === "number" ? o.lots : Number(o.lots);
   const price = typeof o.price === "number" ? o.price : Number(o.price);
   if (ticket === undefined || ticket === null || !side || !Number.isFinite(lots) || !Number.isFinite(price)) return null;
+  const kind = o.kind === "open" || o.kind === "close" ? o.kind : undefined;
+  const reason = o.reason === "signal" || o.reason === "sl" || o.reason === "tp" ? o.reason : undefined;
+  const num = (v: unknown): number | undefined => {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim() !== "") {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : undefined;
+    }
+    return undefined;
+  };
   return {
     ticket: typeof ticket === "number" || typeof ticket === "string" ? ticket : String(ticket),
     side,
     lots,
     price,
     symbol: typeof o.symbol === "string" ? o.symbol : undefined,
-    ts: typeof o.ts === "number" ? o.ts : undefined,
+    ts: num(o.ts),
+    kind,
+    openPrice: num(o.openPrice),
+    closePrice: num(o.closePrice),
+    sl: num(o.sl),
+    tp: num(o.tp),
+    reason,
+    pnl: num(o.pnl),
+    simulated: o.simulated === true ? true : o.simulated === false ? false : undefined,
   };
 }

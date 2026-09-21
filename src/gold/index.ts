@@ -12,6 +12,7 @@ const server = startGoldServer(trader, {
   model: model.name,
   market: "XAUUSD",
   dryRun: goldConfig.dryRun,
+  dummyMt5: goldConfig.dummyMt5,
   startedAt: trader.startedAt,
   feed,
 });
@@ -26,7 +27,10 @@ trader.onEvent = (e) => {
 trader.onSignal = (s) => server.broadcastSignal(s);
 trader.onFill = (f) => {
   server.broadcastFill(f);
-  console.log(`xauusd FILL ${f.side} ${f.lots} @ ${f.price} ticket ${f.ticket}`);
+  const kind = f.kind ?? "fill";
+  const reason = f.reason ? ` ${f.reason}` : "";
+  const pnl = typeof f.pnl === "number" ? ` pnl ${f.pnl.toFixed(2)}` : "";
+  console.log(`xauusd FILL ${kind} ${f.side} ${f.lots} @ ${f.price}${reason}${pnl} ticket ${f.ticket}`);
 };
 
 if (goldConfig.feedUrl) {
@@ -37,4 +41,4 @@ if (goldConfig.feedUrl) {
   console.log(`gold demo walk seed ${seed.toFixed(2)}`);
 }
 
-console.log(`jev-gold model=${model.name} XAUUSD interval ${goldConfig.intervalMs}ms horizon ${goldConfig.horizonMs}ms lot ${goldConfig.lot} sl ${goldConfig.slPoints} tp ${goldConfig.tpPoints} ${goldConfig.dryRun ? "DRY RUN" : "live signals"} :${server.port} /demo`);
+console.log(`jev-gold model=${model.name} XAUUSD interval ${goldConfig.intervalMs}ms horizon ${goldConfig.horizonMs}ms lot ${goldConfig.lot} sl ${goldConfig.slPoints} tp ${goldConfig.tpPoints} ${goldConfig.dryRun ? "DRY RUN" : "live signals"}${goldConfig.dummyMt5 ? " dummy MT5" : ""} :${server.port} /demo`);

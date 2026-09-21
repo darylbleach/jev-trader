@@ -28,6 +28,13 @@ export const goldConfig = {
   tpPoints: parsePositiveInt(env("GOLD_TP_POINTS"), GOLD_DEFAULT_TP_POINTS),
   reverse: env("GOLD_REVERSE", "true") !== "false",
   dryRun: env("GOLD_DRY_RUN", "true") !== "false",
+  /**
+   * Simulated JevLeader tickets. Defaults on whenever dry-run is on (the demo).
+   * Set GOLD_DUMMY_MT5=false to hide them, or GOLD_DRY_RUN=false when a real EA posts /fill.
+   */
+  dummyMt5: (env("GOLD_DUMMY_MT5") ?? env("GOLD_DRY_RUN", "true")) !== "false",
+  /** Standard XAUUSD contract: 100 oz per lot. 0.01 lot and a $1 move is $1 P and L. */
+  contractSize: Number(env("GOLD_CONTRACT_SIZE", "100")),
   /** GOLD_MODEL wins so gold can use Jev while the Kuru demo stays on mock. */
   model: (env("GOLD_MODEL") ?? env("MODEL", "mock")) as "mock" | "jev",
   jevModelId: env("JEV_MODEL_ID", "jev-latest")!,

@@ -10,7 +10,7 @@ From the repo root (does not start the Kuru bot):
 
     bun run gold
 
-Default bind is `http://127.0.0.1:3001`. Open `/` or `/demo` for the live XAUUSD page. Dry-run is on unless you set `GOLD_DRY_RUN=false`. Jev still answers either way. `GOLD_MODEL=mock` is the stand-in; `GOLD_MODEL=jev` plus `TYPESAFE_AI_API_KEY` uses Jev.
+Default bind is `http://127.0.0.1:3001`. Open `/` or `/demo` for the live XAUUSD page. Dry-run is on unless you set `GOLD_DRY_RUN=false`. Jev still answers either way. `GOLD_MODEL=mock` is the stand-in; `GOLD_MODEL=jev` plus `TYPESAFE_AI_API_KEY` uses Jev. With dry-run the gold page also shows simulated JevLeader tickets (MT5 dummy). That is not a live broker.
 
 Post a tick yourself if no EA is attached:
 
