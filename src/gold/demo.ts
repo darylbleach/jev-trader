@@ -311,7 +311,7 @@ function renderDummy(): void {
   const note = $("dummyNote");
   if (note) {
     note.textContent = dummyEnabled
-      ? "Simulated tickets. Not a live broker. Shows what JevLeader would open and close on XAUUSD, with profit or loss on every close."
+      ? "Simulated tickets. Not a live broker. Holds the open ticket while the live mid is unchanged so a flip does not scratch at the same price."
       : "Dummy MT5 is off. Attach the real EAs to see broker fills.";
   }
   const record = $("dummyRecord");

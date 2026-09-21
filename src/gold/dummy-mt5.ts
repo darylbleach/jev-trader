@@ -10,6 +10,19 @@ export interface DummyMt5Options {
   point: number;
   contractSize: number;
   historySize: number;
+  /** Hold a reverse until mid has moved at least this many points from the open. Default 1. */
+  minReversePoints?: number;
+}
+
+/** True when the live mid has moved enough to justify a dummy reverse close. */
+export function dummyReverseAllowed(
+  openPrice: number,
+  mid: number,
+  minPoints: number,
+  point: number,
+): boolean {
+  if (!(point > 0) || !(minPoints > 0)) return true;
+  return Math.abs(mid - openPrice) >= minPoints * point - 1e-9;
 }
 
 export function stopPrices(
@@ -122,11 +135,19 @@ export class DummyMt5Account {
   /**
    * Match JevLeader: if the standing position differs from the open ticket,
    * close the old one at mid (signal) then open the other side.
+   * Hold a reverse while mid is still at the open (live spot often sits still).
+   * Flatten still closes at mid so a real flatten is not blocked.
    */
   sync(want: PositionSide, mid: number, ts: number): DummyFill[] {
     const fills: DummyFill[] = [];
     const have: PositionSide = this.open?.side ?? "flat";
     if (have === want) return fills;
+    if (this.open && (want === "buy" || want === "sell")) {
+      const minPoints = this.opts.minReversePoints ?? 1;
+      if (!dummyReverseAllowed(this.open.openPrice, mid, minPoints, this.opts.point)) {
+        return fills;
+      }
+    }
     if (this.open) {
       const closed = this.closeAt(mid, "signal", ts);
       if (closed) fills.push(closed);

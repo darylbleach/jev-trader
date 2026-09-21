@@ -136,6 +136,24 @@ test("dummy MT5 opens a buy ticket on the first signal", async () => {
   expect(snap.totals.fills).toBe(1);
 });
 
+test("dummy MT5 holds a reverse while the live mid is unchanged", async () => {
+  const model = new FixedModel("buy");
+  const trader = new GoldTrader(model, new DummyMt5Account(dummyOpts));
+  await trader.onTick({ bid: 2650, ask: 2650 }, 1_000);
+  model.action = "sell";
+  await trader.onTick({ bid: 2650, ask: 2650 }, 2_000);
+  const snap = trader.snapshot();
+  expect(snap.latest?.action).toBe("sell");
+  expect(snap.position).toBe("buy");
+  expect(snap.openTicket?.side).toBe("buy");
+  expect(snap.openTicket?.openPrice).toBe(2650);
+  expect(snap.dummyTrades).toHaveLength(0);
+  expect(snap.wins).toBe(0);
+  expect(snap.losses).toBe(0);
+  expect(snap.realizedUsd).toBe(0);
+  expect(snap.totals.fills).toBe(1);
+});
+
 test("dummy MT5 reverse closes at mid then opens the other side", async () => {
   const model = new FixedModel("buy");
   const trader = new GoldTrader(model, new DummyMt5Account(dummyOpts));

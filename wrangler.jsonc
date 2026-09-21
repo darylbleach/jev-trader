@@ -30,7 +30,8 @@
     "GOLD_TP_POINTS": "800",
     "GOLD_REVERSE": "true",
     "XAUUSD_SPOT_URL": "https://api.gold-api.com/price/XAU",
-    "XAUUSD_SPOT_REFRESH_MS": "5000"
+    "XAUUSD_SPOT_REFRESH_MS": "1000",
+    "GOLD_MIN_REVERSE_POINTS": "1"
   },
   "durable_objects": {
     "bindings": [

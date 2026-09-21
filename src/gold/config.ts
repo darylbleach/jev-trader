@@ -27,6 +27,11 @@ export const goldConfig = {
   slPoints: parsePositiveInt(env("GOLD_SL_POINTS"), GOLD_DEFAULT_SL_POINTS),
   tpPoints: parsePositiveInt(env("GOLD_TP_POINTS"), GOLD_DEFAULT_TP_POINTS),
   reverse: env("GOLD_REVERSE", "true") !== "false",
+  /**
+   * Dummy reverse only after the live mid has moved at least this many points.
+   * Stops scratch $0 closes when Jev flips on an unchanged spot.
+   */
+  minReversePoints: parsePositiveInt(env("GOLD_MIN_REVERSE_POINTS"), 1),
   dryRun: env("GOLD_DRY_RUN", "true") !== "false",
   /**
    * Simulated JevLeader tickets. Defaults on whenever dry-run is on (the demo).
@@ -47,7 +52,10 @@ export const goldConfig = {
   demo: env("GOLD_DEMO", "true") !== "false",
   /** Public XAUUSD spot used by the built-in live demo poller. */
   spotUrl: env("XAUUSD_SPOT_URL", "https://api.gold-api.com/price/XAU")!,
-  /** How often to refresh the live spot. Decisions still run every intervalMs. */
-  spotRefreshMs: Number(env("XAUUSD_SPOT_REFRESH_MS", "5000")),
+  /**
+   * How often to refresh the live spot. Default matches GOLD_INTERVAL_MS so Jev
+   * sees a quote as fresh as gold-api will serve (Cache-Control max-age is 1s).
+   */
+  spotRefreshMs: Number(env("XAUUSD_SPOT_REFRESH_MS", "1000")),
   historySize: 1000,
 };

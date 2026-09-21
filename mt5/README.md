@@ -98,9 +98,9 @@ Netting-style: one side at a time. Opposite signal closes, then opens, when `GOL
 
 The demo no longer invents a price path after one seed.
 
-1. Every `XAUUSD_SPOT_REFRESH_MS` (default 5s) the process fetches `XAUUSD_SPOT_URL` (default `https://api.gold-api.com/price/XAU`).
+1. Every `XAUUSD_SPOT_REFRESH_MS` (default 1s) the process fetches `XAUUSD_SPOT_URL` (default `https://api.gold-api.com/price/XAU`). gold-api serves `Cache-Control: max-age=1`.
 2. If that fails, it tries Yahoo COMEX gold futures (`GC=F`) as a fallback.
-3. Jev still answers every `GOLD_INTERVAL_MS` (default 1s) on the last live mid. Spot gold does not print a new tick every second, so the mid can sit still between refreshes. That is honest.
+3. Jev still answers every `GOLD_INTERVAL_MS` (default 1s) on the last live mid. Spot gold can still sit still between prints. The dummy tape holds a reverse until the mid has moved at least `GOLD_MIN_REVERSE_POINTS` (default 1 point) so a flip on a flat quote does not scratch at $0.
 4. If a live quote has landed and the next fetch fails, the last live mid is held. No walk.
 5. If no live quote has ever landed, a small walk around 2650 keeps the page alive and the feed pill says `demo`.
 
@@ -284,7 +284,8 @@ They do not retry a missed `seq`. The next new `seq` is the next trade. A brief 
 | `GOLD_MAX_SPREAD_PIPS` | `30` | `spreadOk` threshold |
 | `XAUUSD_FEED_URL` | unset | leave unset in production |
 | `XAUUSD_SPOT_URL` | gold-api XAU | demo only |
-| `XAUUSD_SPOT_REFRESH_MS` | `5000` | demo only |
+| `XAUUSD_SPOT_REFRESH_MS` | `1000` | demo only |
+| `GOLD_MIN_REVERSE_POINTS` | `1` | dummy reverse only after mid moves |
 
 `GOLD_MODEL` wins over `MODEL`, so gold can use Jev while the Kuru tweet demo stays on mock.
 

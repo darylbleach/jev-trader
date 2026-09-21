@@ -18,7 +18,7 @@ export class GoldRoom extends DurableObject<Env> {
   private live = false;
   private lastFetch = 0;
   private intervalMs = 1000;
-  private refreshMs = 5000;
+  private refreshMs = 1000;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -63,7 +63,7 @@ export class GoldRoom extends DurableObject<Env> {
     const model = createGoldModel();
     const trader = new GoldTrader(model);
     this.intervalMs = goldConfig.intervalMs > 0 ? goldConfig.intervalMs : 1000;
-    this.refreshMs = goldConfig.spotRefreshMs > 0 ? goldConfig.spotRefreshMs : 5000;
+    this.refreshMs = goldConfig.spotRefreshMs > 0 ? goldConfig.spotRefreshMs : 1000;
     this.meta = {
       model: model.name,
       market: "XAUUSD",
