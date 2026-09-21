@@ -435,11 +435,20 @@ body {
 }
 
 .dummy-open {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 4px;
   margin: 12px 0 8px;
   font-family: var(--font-mono);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-2);
+}
+
+.dummy-open .leg {
+  white-space: nowrap;
 }
 
 .dummy-open .buy {
@@ -537,7 +546,6 @@ body {
 
   .dummy-open {
     white-space: normal;
-    overflow-wrap: anywhere;
   }
 
   .pnl-grid {
@@ -552,19 +560,29 @@ body {
     height: 200px;
   }
 
-  .dummy-tape .row {
-    grid-template-columns: 44px 1fr auto;
+  .dummy-tape .row:not(.empty) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "id side pnl"
-      "open close close";
-    row-gap: 2px;
+      "open open close";
+    column-gap: 12px;
+    row-gap: 3px;
+    align-items: baseline;
   }
 
   .dummy-tape .t-id { grid-area: id; }
   .dummy-tape .t-side { grid-area: side; }
   .dummy-tape .t-open { grid-area: open; }
-  .dummy-tape .t-close { grid-area: close; }
-  .dummy-tape .t-pnl { grid-area: pnl; }
+  .dummy-tape .t-close { grid-area: close; justify-self: end; }
+  .dummy-tape .t-pnl { grid-area: pnl; justify-self: end; }
+
+  .dummy-tape .t-id,
+  .dummy-tape .t-side,
+  .dummy-tape .t-open,
+  .dummy-tape .t-close,
+  .dummy-tape .t-pnl {
+    white-space: nowrap;
+  }
 
   .dummy-tape .row.empty {
     display: block;
@@ -630,15 +648,14 @@ body {
   }
 
   .last-ticket,
-  .dummy-open,
   .order,
   .dummy-note,
   .foot {
     overflow-wrap: anywhere;
   }
 
-  .tape .row {
-    grid-template-columns: 36px 40px 1fr 40px;
+  .tape:not(.dummy-tape) .row {
+    grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1.4fr) auto;
     font-size: 11px;
   }
 
