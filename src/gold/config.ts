@@ -1,12 +1,13 @@
 const env = (key: string, fallback?: string) => process.env[key] ?? fallback;
 
 /**
- * Quick XAUUSD scalp stop. Many brokers quote SYMBOL_POINT 0.01, so 80 points is $0.80.
- * Still above a typical ~15 pip / $0.15 spread. Cut the loser instead of sitting through a multi dollar dip.
+ * XAUUSD scalp stop. Many brokers quote SYMBOL_POINT 0.01, so 100 points is $1.00.
+ * A live spot bounce of about $0.80 tagged a $0.40 stop and knocked out the side
+ * that was about to pay. Leave room for that bounce. Still not a multi dollar hold.
  */
-export const GOLD_DEFAULT_SL_POINTS = 80;
-/** Quick take profit, a bit wider than the stop: 120 points is $1.20. Take the small win and get out. */
-export const GOLD_DEFAULT_TP_POINTS = 120;
+export const GOLD_DEFAULT_SL_POINTS = 100;
+/** Quick take profit, closer than the stop: 60 points is $0.60. Bank the small win. */
+export const GOLD_DEFAULT_TP_POINTS = 60;
 /** Short near-term window Jev is asked about. Not a swing hold. */
 export const GOLD_DEFAULT_HORIZON_MS = 6000;
 
