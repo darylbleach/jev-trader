@@ -14,6 +14,8 @@ export interface GoldSignal {
   late: boolean;
   sim: boolean;
   lot: number;
+  slPoints: number;
+  tpPoints: number;
   position: PositionSide;
   reverse: boolean;
   spreadOk: boolean;

@@ -32,10 +32,13 @@ Attach `JevLeader` to an XAUUSD / GOLD / XAUUSDm chart on the account that shoul
 - `InpServer` gold server origin
 - `InpSymbol` `XAUUSD` (falls back to `GOLD`, `XAUUSDm`, and a few suffixes)
 - `InpLot` used if the signal lot is missing
-- `InpSlippage`, `InpMagic`, optional `InpSLPoints` / `InpTPPoints`
+- `InpSlippage`, `InpMagic`
+- `InpSLPoints` / `InpTPPoints` (defaults 2000 / 2500). Every new market order always gets both. If an input is 0, the EA uses `slPoints` / `tpPoints` from `/signal`, then the same hardcoded defaults. Distances are raised to `SYMBOL_TRADE_STOPS_LEVEL` so the broker does not reject the order.
 - `InpMaxSpreadPips`, `InpMaxAgeMs`
 
 Every ~200 ms it POSTs bid/ask to `/tick` and GETs `/signal`. On a new `seq` it opens, reverses, or flattens to match `position`. After a fill it POSTs `/fill`.
+
+On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) those defaults are $20 stop loss and $25 take profit. That is a real exit, not a one-pip scalp. Change `GOLD_SL_POINTS` / `GOLD_TP_POINTS` on the server (those values ride on `/signal`) or the EA inputs if you want a different distance. Leader and followers stay in sync when they take the signal numbers.
 
 ## 4. Followers
 
@@ -48,6 +51,8 @@ Lot math (same as `scaleLots` in `src/gold/policy.ts`):
 Then round down to the broker lot step and clamp to `InpMinLot` / `InpMaxLot`. If that rounds below min lot, the EA does not open.
 
 Set `InpLeaderEquity` to the leader account equity you want to scale against. Set `InpLotMult` to 1 to copy proportional to equity.
+
+Follower SL/TP uses the same rule as the leader: EA inputs, then signal `slPoints` / `tpPoints`, then 2000 / 2500, then clamp to the broker stops level. Confirm the attached SL and TP on the new ticket in the Trade tab.
 
 ## 5. Notes
 

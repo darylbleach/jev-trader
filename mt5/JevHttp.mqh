@@ -3,6 +3,9 @@
 
 #include <Trade/Trade.mqh>
 
+#define JEV_DEFAULT_SL_POINTS 2000
+#define JEV_DEFAULT_TP_POINTS 2500
+
 string JevTrim(string s)
 {
    StringTrimLeft(s);
@@ -179,6 +182,56 @@ double JevSpreadPips(const string symbol, const double point)
    if(point <= 0)
       return 1.0e12;
    return (ask - bid) / point;
+}
+
+int JevExitPoints(const int inp, const int fromSignal, const int fallback)
+{
+   int pts = inp;
+   if(pts <= 0)
+      pts = fromSignal;
+   if(pts <= 0)
+      pts = fallback;
+   if(pts < 1)
+      pts = 1;
+   return pts;
+}
+
+int JevClampStops(const string symbol, const int points)
+{
+   int stops = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
+   if(stops < 0)
+      stops = 0;
+   int pts = points;
+   if(pts < stops)
+      pts = stops;
+   if(pts < 1)
+      pts = 1;
+   return pts;
+}
+
+bool JevStops(const string symbol, const int need, const int slPoints, const int tpPoints, double &sl, double &tp)
+{
+   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+   double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+   int slPts = JevClampStops(symbol, slPoints);
+   int tpPts = JevClampStops(symbol, tpPoints);
+   sl = 0;
+   tp = 0;
+   if(point <= 0 || bid <= 0 || ask <= 0)
+      return false;
+   if(need > 0)
+     {
+      sl = NormalizeDouble(ask - slPts * point, digits);
+      tp = NormalizeDouble(ask + tpPts * point, digits);
+     }
+   else
+     {
+      sl = NormalizeDouble(bid + slPts * point, digits);
+      tp = NormalizeDouble(bid - tpPts * point, digits);
+     }
+   return (sl > 0 && tp > 0);
 }
 
 double JevNormLot(const string symbol, double lots, const double minLot, const double maxLot)

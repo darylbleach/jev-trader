@@ -24,6 +24,19 @@ test("first tick produces a signal", async () => {
   expect(s?.late).toBe(false);
   expect(s?.position).toBe("buy");
   expect(s?.seq).toBe(1);
+  expect(s?.slPoints).toBeGreaterThan(0);
+  expect(s?.tpPoints).toBeGreaterThan(0);
+});
+
+test("signal carries non-zero SL and TP points from gold config", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"));
+  await trader.onTick({ bid: 2650, ask: 2650.2 }, 1_000);
+  const s = trader.signal();
+  const snap = trader.snapshot();
+  expect(s?.slPoints).toBe(snap.slPoints);
+  expect(s?.tpPoints).toBe(snap.tpPoints);
+  expect(snap.slPoints).toBeGreaterThan(0);
+  expect(snap.tpPoints).toBeGreaterThan(0);
 });
 
 test("overlapping ticks mark late and keep the last signal", async () => {

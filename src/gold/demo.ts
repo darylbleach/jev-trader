@@ -13,6 +13,8 @@ interface GoldSignal {
   late: boolean;
   sim: boolean;
   lot: number;
+  slPoints?: number;
+  tpPoints?: number;
   position: "buy" | "sell" | "flat";
 }
 
@@ -111,6 +113,8 @@ function renderStats(): void {
     ["FILLS", String(totals.fills)],
     ["JEV USD", totals.jevUsd.toFixed(4)],
     ["SPREAD", latest ? `${latest.spreadPips.toFixed(1)} pips` : "-"],
+    ["SL", latest?.slPoints ? `${latest.slPoints} pts` : "-"],
+    ["TP", latest?.tpPoints ? `${latest.tpPoints} pts` : "-"],
   ];
   el.innerHTML = cells.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 }

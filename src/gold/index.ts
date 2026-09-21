@@ -37,4 +37,4 @@ if (goldConfig.feedUrl) {
   console.log(`gold demo walk seed ${seed.toFixed(2)}`);
 }
 
-console.log(`jev-gold model=${model.name} XAUUSD interval ${goldConfig.intervalMs}ms horizon ${goldConfig.horizonMs}ms lot ${goldConfig.lot} ${goldConfig.dryRun ? "DRY RUN" : "live signals"} :${server.port} /demo`);
+console.log(`jev-gold model=${model.name} XAUUSD interval ${goldConfig.intervalMs}ms horizon ${goldConfig.horizonMs}ms lot ${goldConfig.lot} sl ${goldConfig.slPoints} tp ${goldConfig.tpPoints} ${goldConfig.dryRun ? "DRY RUN" : "live signals"} :${server.port} /demo`);

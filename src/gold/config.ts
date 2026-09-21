@@ -1,5 +1,18 @@
 const env = (key: string, fallback?: string) => process.env[key] ?? fallback;
 
+/** Many XAUUSD brokers quote with SYMBOL_POINT 0.01, so 2000 points is $20 of gold. */
+export const GOLD_DEFAULT_SL_POINTS = 2000;
+/** Slightly wider than SL: 2500 points is $25 of gold at SYMBOL_POINT 0.01. */
+export const GOLD_DEFAULT_TP_POINTS = 2500;
+
+/** Env integers used for SL/TP. Zero, negative, or non-numeric values fall back so exits stay on. */
+export function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
+}
+
 export const goldConfig = {
   port: Number(env("GOLD_PORT", "3001")),
   intervalMs: Number(env("GOLD_INTERVAL_MS", "1000")),
@@ -9,6 +22,8 @@ export const goldConfig = {
   maxSpreadPips: Number(env("GOLD_MAX_SPREAD_PIPS", "30")),
   /** XAUUSD point used to convert a price delta into pips. 0.01 is one pip on a 2-decimal quote. */
   point: Number(env("GOLD_POINT", "0.01")),
+  slPoints: parsePositiveInt(env("GOLD_SL_POINTS"), GOLD_DEFAULT_SL_POINTS),
+  tpPoints: parsePositiveInt(env("GOLD_TP_POINTS"), GOLD_DEFAULT_TP_POINTS),
   reverse: env("GOLD_REVERSE", "true") !== "false",
   dryRun: env("GOLD_DRY_RUN", "true") !== "false",
   /** GOLD_MODEL wins so gold can use Jev while the Kuru demo stays on mock. */

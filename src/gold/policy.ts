@@ -41,3 +41,20 @@ export function spreadPips(bid: number, ask: number, point: number): number {
 export function midPrice(bid: number, ask: number): number {
   return (bid + ask) / 2;
 }
+
+/**
+ * EA rule for stop and take-profit distance: use the input if it is > 0, else the
+ * signal, else the hardcoded default. Never returns 0.
+ */
+export function resolveExitPoints(input: number, signal: number, fallback: number): number {
+  const pick = input > 0 ? input : signal > 0 ? signal : fallback;
+  if (!Number.isFinite(pick) || pick <= 0) return Math.max(1, Math.floor(fallback) || 1);
+  return Math.floor(pick);
+}
+
+/** Raise SL/TP points to SYMBOL_TRADE_STOPS_LEVEL so the broker does not reject the order. */
+export function clampStopsLevel(points: number, stopsLevel: number): number {
+  const stops = Number.isFinite(stopsLevel) && stopsLevel > 0 ? Math.floor(stopsLevel) : 0;
+  const pts = Number.isFinite(points) ? Math.floor(points) : 0;
+  return Math.max(1, Math.max(stops, pts));
+}

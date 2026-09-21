@@ -25,4 +25,6 @@ test("demo walk posts a tick the model can decide on", async () => {
   expect(s?.action).toBe("buy");
   expect(s?.mid).toBeGreaterThan(100);
   expect(s?.spreadOk).toBe(true);
+  expect(s?.slPoints).toBeGreaterThan(0);
+  expect(s?.tpPoints).toBeGreaterThan(0);
 });

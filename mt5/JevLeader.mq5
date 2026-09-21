@@ -11,8 +11,8 @@ input string InpSymbol       = "XAUUSD";
 input double InpLot          = 0.01;
 input int    InpSlippage     = 30;
 input long   InpMagic        = 210921;
-input int    InpSLPoints     = 0;
-input int    InpTPPoints     = 0;
+input int    InpSLPoints     = 2000;
+input int    InpTPPoints     = 2500;
 input int    InpMaxSpreadPips = 30;
 input int    InpMaxAgeMs     = 5000;
 input int    InpTimeoutMs    = 2000;
@@ -39,7 +39,7 @@ int OnInit()
       Print("JevLeader: timer failed");
       return INIT_FAILED;
      }
-   Print("JevLeader symbol=", g_symbol, " server=", InpServer);
+   Print("JevLeader symbol=", g_symbol, " server=", InpServer, " sl=", InpSLPoints, " tp=", InpTPPoints);
    return INIT_SUCCEEDED;
 }
 
@@ -66,6 +66,8 @@ void OnTimer()
    double lot = JevJsonNumber(raw, "lot", InpLot);
    if(lot <= 0)
       lot = InpLot;
+   int slPts = JevExitPoints(InpSLPoints, (int)JevJsonNumber(raw, "slPoints", 0), JEV_DEFAULT_SL_POINTS);
+   int tpPts = JevExitPoints(InpTPPoints, (int)JevJsonNumber(raw, "tpPoints", 0), JEV_DEFAULT_TP_POINTS);
 
    long now_ms = (long)TimeGMT() * 1000;
    if(ts > 0 && MathAbs((double)now_ms - ts) > InpMaxAgeMs)
@@ -82,7 +84,7 @@ void OnTimer()
    if(seq == g_last_seq && action == g_last_action)
       return;
 
-   if(!ApplyPosition(position, action, lot, seq))
+   if(!ApplyPosition(position, action, lot, slPts, tpPts))
       return;
    g_last_seq = seq;
    g_last_action = action;
@@ -110,7 +112,7 @@ void PostFill(const ulong ticket, const string side, const double lots, const do
    JevHttp("POST", JevJoin(InpServer, "/fill"), body, InpTimeoutMs);
 }
 
-bool ApplyPosition(const string want, const string action, double lot, const int seq)
+bool ApplyPosition(const string want, const string action, double lot, const int slPts, const int tpPts)
 {
    int have = JevOurSide(g_symbol, InpMagic);
    string target = want;
@@ -148,34 +150,27 @@ bool ApplyPosition(const string want, const string action, double lot, const int
       Print("JevLeader: lot rounded to 0");
       return false;
      }
-   return OpenSide(need, lot);
+   return OpenSide(need, lot, slPts, tpPts);
 }
 
-bool OpenSide(const int need, const double lot)
+bool OpenSide(const int need, const double lot, const int slPts, const int tpPts)
 {
-   double point = SymbolInfoDouble(g_symbol, SYMBOL_POINT);
-   int digits = (int)SymbolInfoInteger(g_symbol, SYMBOL_DIGITS);
-   double bid = SymbolInfoDouble(g_symbol, SYMBOL_BID);
-   double ask = SymbolInfoDouble(g_symbol, SYMBOL_ASK);
    double sl = 0;
    double tp = 0;
+   if(!JevStops(g_symbol, need, slPts, tpPts, sl, tp))
+     {
+      Print("JevLeader: refused order, SL/TP would be zero");
+      return false;
+     }
    bool ok = false;
    if(need > 0)
      {
-      if(InpSLPoints > 0)
-         sl = NormalizeDouble(ask - InpSLPoints * point, digits);
-      if(InpTPPoints > 0)
-         tp = NormalizeDouble(ask + InpTPPoints * point, digits);
       ok = trade.Buy(lot, g_symbol, 0, sl, tp, "jev-gold");
       if(ok)
          PostFill(trade.ResultOrder(), "buy", lot, trade.ResultPrice());
      }
    else
      {
-      if(InpSLPoints > 0)
-         sl = NormalizeDouble(bid + InpSLPoints * point, digits);
-      if(InpTPPoints > 0)
-         tp = NormalizeDouble(bid - InpTPPoints * point, digits);
       ok = trade.Sell(lot, g_symbol, 0, sl, tp, "jev-gold");
       if(ok)
          PostFill(trade.ResultOrder(), "sell", lot, trade.ResultPrice());

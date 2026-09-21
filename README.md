@@ -23,6 +23,8 @@ Opens a gold-only process on `GOLD_PORT` (default 3001) with a live demo page at
 - `GET /signal` latest buy/sell for the MT5 EAs
 - `POST /tick` `POST /fill` `GET /events`
 
+`GET /signal` always includes `slPoints` and `tpPoints` (defaults 2000 and 2500, or `GOLD_SL_POINTS` / `GOLD_TP_POINTS`). On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $20 stop loss and $25 take profit. The MT5 EAs attach both on every new gold market order so positions can close.
+
 To execute on a broker and copy to follower accounts, attach the EAs in `mt5/` (see `mt5/README.md`). That path is a broker CFD, not an on-chain Kuru market.
 
 ## Endpoints
