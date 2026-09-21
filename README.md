@@ -33,15 +33,17 @@ To execute on a broker and copy to follower accounts, attach the EAs in `mt5/` (
 
 ## Cloudflare gold demo (shareable)
 
-This is the XAUUSD page only, not the Kuru MON-USDC bot. Workers cron cannot tick every second, so a Durable Object alarm walks the mid once a second while someone is watching. The public deploy defaults to `GOLD_MODEL=mock` so it runs without a TypeSafe key. Jev is optional: put `TYPESAFE_AI_API_KEY` as a Worker secret and set `GOLD_MODEL` to `jev`.
+Live now: [https://jev-gold-demo.darylbleach.workers.dev](https://jev-gold-demo.darylbleach.workers.dev). That is the XAUUSD page only, not the Kuru MON-USDC bot. Send that link. It fits a phone (stacked cards, no sideways scroll) and a desktop. Workers cron cannot tick every second, so a Durable Object alarm walks the mid once a second while someone is watching. The public deploy defaults to `GOLD_MODEL=mock` so it runs without a TypeSafe key. Jev is optional: put `TYPESAFE_AI_API_KEY` as a Worker secret and set `GOLD_MODEL` to `jev`.
+
+`/` and `/demo` are the dashboard. `/status` `/signal` `/events` `/tick` `/fill` are the same gold API as `bun run gold`.
+
+To publish a change:
 
 ```
 bun install
 npx wrangler login
 npx wrangler deploy
 ```
-
-Wrangler prints a `*.workers.dev` URL (this account uses `https://jev-gold-demo.darylbleach.workers.dev` after a logged-in deploy). Send that link. `/` and `/demo` are the dashboard. `/status` `/signal` `/events` `/tick` `/fill` are the same gold API as `bun run gold`. A `npx wrangler deploy --temporary` preview is challenge-gated, so use `wrangler login` for a link you can send.
 
 Optional Jev on the hosted demo:
 
