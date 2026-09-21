@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F0EEE9" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Jev Gold</title>
+    <link rel="stylesheet" href="./demo.css" />
+  </head>
+  <body>
+    <div class="card">
+      <header class="header">
+        <div class="brand-row">
+          <span class="brand">Jev Gold</span>
+          <span class="pair">XAUUSD</span>
+          <span class="seq" id="seq">seq -</span>
+        </div>
+        <span class="offline" id="offline"></span>
+        <div class="pills">
+          <span class="pill" id="feed">demo</span>
+          <span class="badge" id="model">mock</span>
+        </div>
+      </header>
+
+      <section class="pnl-band" id="pnlBand">
+        <div class="pnl-label">
+          <span class="section-label">DUMMY MT5 P AND L</span>
+          <span class="sim-tag">simulated</span>
+        </div>
+        <div class="pnl-grid">
+          <div class="pnl-card">
+            <div class="pnl-k">REALIZED</div>
+            <div class="pnl-v" id="pnlRealized">$0.00</div>
+          </div>
+          <div class="pnl-card">
+            <div class="pnl-k">OPEN</div>
+            <div class="pnl-v" id="pnlOpen">$0.00</div>
+          </div>
+          <div class="pnl-card">
+            <div class="pnl-k">TOTAL</div>
+            <div class="pnl-v" id="pnlTotal">$0.00</div>
+          </div>
+        </div>
+        <div class="last-ticket" id="lastTicket">no dummy result yet</div>
+      </section>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="main">
+        <div class="left">
+          <div class="price-row">
+            <div>
+              <div class="price-label">MID</div>
+              <div class="price" id="mid">-</div>
+            </div>
+            <div class="pos" id="pos">flat</div>
+          </div>
+          <canvas id="chart" width="900" height="280"></canvas>
+        </div>
+        <div class="right">
+          <section class="panel">
+            <div class="section-label">STANDING ORDER</div>
+            <p class="order">scalp XAUUSD with small in and out buys and sells. the model answers about once a second. no abstaining.</p>
+          </section>
+          <section class="panel">
+            <div class="section-label">WHICH SIDE THIS TICK?</div>
+            <div class="headline" id="headline">WAIT</div>
+            <div class="bar-row">
+              <span class="bar-label buy">buy</span>
+              <div class="track"><div class="fill buy" id="buyFill"></div></div>
+              <span class="bar-pct" id="buyPct">-</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label sell">sell</span>
+              <div class="track"><div class="fill sell" id="sellFill"></div></div>
+              <span class="bar-pct" id="sellPct">-</span>
+            </div>
+            <div class="latency" id="latency"></div>
+          </section>
+          <section class="tape-wrap">
+            <div class="section-label">DECISIONS</div>
+            <div class="tape" id="tape"></div>
+          </section>
+        </div>
+      </div>
+
+      <section class="dummy" id="dummyPanel">
+        <div class="dummy-head">
+          <div>
+            <div class="section-label">DUMMY TRADE TAPE</div>
+            <p class="dummy-note" id="dummyNote">Simulated tickets. Not a live broker. Shows what JevLeader would open and close on XAUUSD, with profit or loss on every close.</p>
+          </div>
+          <div class="dummy-record" id="dummyRecord">W 0  L 0</div>
+        </div>
+        <div class="dummy-open" id="dummyOpen">waiting for first ticket</div>
+        <div class="tape dummy-tape" id="dummyTape"></div>
+      </section>
+
+      <p class="foot">Experimental gold scalp demo. Jev (or the stand-in) decides small in and out buys or sells from the XAUUSD feed. The MT5 dummy tape is simulated so you can see opens and closes without a broker. Live broker fills only happen if you attach the MT5 EAs. Not financial advice.</p>
+    </div>
+    <script type="module" src="./demo.ts"></script>
+  </body>
+</html>

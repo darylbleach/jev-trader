@@ -10,6 +10,50 @@ One decision every Monad block. A TypeSafe Jev model watches the Kuru MON-USDC o
 
 With no `PRIVATE_KEY` it dry-runs: real book, real decisions, simulated fills. Set `MODEL=jev` and `TYPESAFE_AI_API_KEY` to use Jev; the default `mock` is a momentum heuristic stand-in.
 
+## XAUUSD copy trader (separate process)
+
+This does not replace the Monad/Kuru demo. `bun run start` is still MON-USDC on Kuru every block.
+
+    bun run gold
+
+Opens a gold-only process on `GOLD_PORT` (default 3001) with a live demo page at `/` and `/demo`. A built-in XAUUSD walk seeds from a public gold spot and keeps ticking so Jev (or the mock) can decide without MetaTrader. Set `GOLD_MODEL=jev` and `TYPESAFE_AI_API_KEY` to use Jev on gold while leaving the Kuru `MODEL` alone.
+
+- `GET /` or `GET /demo` dashboard
+- `GET /status` snapshot
+- `GET /signal` latest buy/sell for the MT5 EAs
+- `POST /tick` `POST /fill` `GET /events`
+
+This gold process is a small in-out scalp, not a swing hold. Jev is asked about a short near-term move (`GOLD_HORIZON_MS` default 6000, about 6 seconds) and answers about once a second (`GOLD_INTERVAL_MS`). An opposite signal closes and flips (`GOLD_REVERSE=true`).
+
+`GET /signal` always includes `slPoints` and `tpPoints` (defaults 600 and 800, or `GOLD_SL_POINTS` / `GOLD_TP_POINTS`). On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $6 stop loss and $8 take profit, well above a typical ~15 pip / $0.15 spread. The MT5 EAs attach both on every new gold market order so each scalp can exit.
+
+Dry-run (default) also simulates JevLeader tickets so the gold page can show what would happen without a broker: market open at mid, reverse close then open, flatten close only, and SL/TP exits when price touches. Open ticket, recent dummy trades, and running P and L are on `GET /status` and the demo page under MT5 dummy (simulated, not a live broker). Dummy fills reuse `POST /fill` internally and the existing SSE `fill` events. Set `GOLD_DUMMY_MT5=false` to turn that off, or `GOLD_DRY_RUN=false` when a real EA posts `/fill`.
+
+To execute on a broker and copy to follower accounts, attach the EAs in `mt5/` (see `mt5/README.md`). That path is a broker CFD, not an on-chain Kuru market.
+
+## Cloudflare gold demo (shareable)
+
+Live now: [https://jev-gold-demo.darylbleach.workers.dev](https://jev-gold-demo.darylbleach.workers.dev). That is the XAUUSD page only, not the Kuru MON-USDC bot. Send that link. It fits a phone (stacked cards, no sideways scroll) and a desktop. Workers cron cannot tick every second, so a Durable Object alarm walks the mid once a second while someone is watching. The public deploy defaults to `GOLD_MODEL=mock` so it runs without a TypeSafe key. Jev is optional: put `TYPESAFE_AI_API_KEY` as a Worker secret and set `GOLD_MODEL` to `jev`.
+
+`/` and `/demo` are the dashboard. `/status` `/signal` `/events` `/tick` `/fill` are the same gold API as `bun run gold`.
+
+To publish a change:
+
+```
+bun install
+npx wrangler login
+npx wrangler deploy
+```
+
+Optional Jev on the hosted demo:
+
+```
+npx wrangler secret put TYPESAFE_AI_API_KEY
+npx wrangler secret put GOLD_MODEL
+```
+
+When prompted for `GOLD_MODEL`, enter `jev`. Local preview: `npx wrangler dev` then open `http://127.0.0.1:8787`.
+
 ## Endpoints
 
 Deployed (dry run, mock model): https://jev-trader-production.up.railway.app
@@ -54,6 +98,8 @@ Live sends are fired and forgotten, so the `block` event carries the **intent**:
     src/model.ts    Model interface, JevModel (AI SDK experimental_evaluate), MockModel
     src/trader.ts   the loop: one in flight, hold when late, position and P&L accounting
     src/server.ts   Bun.serve: snapshot, history, SSE
+    src/gold/       XAUUSD signal process and demo (separate from the Kuru loop)
+    mt5/            JevLeader and JevFollower Expert Advisors
 
 ## The 300 ms budget
 
