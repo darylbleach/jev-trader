@@ -30,6 +30,8 @@ test("dummy MT5 is on by default in dry-run", () => {
   expect(goldConfig.dryRun).toBe(true);
   expect(goldConfig.dummyMt5).toBe(true);
   expect(goldConfig.contractSize).toBe(100);
+  expect(goldConfig.minReversePoints).toBe(1);
+  expect(goldConfig.spotRefreshMs).toBe(1000);
 });
 
 test("parsePositiveInt keeps valid points and falls back on zero or junk", () => {

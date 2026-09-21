@@ -41,8 +41,8 @@ export function goldDecisionFromEvaluate(
 }
 
 export class GoldJevModel implements GoldModel {
-  readonly name = goldConfig.jevModelId;
-  private model = typeSafeAi.evaluationModel(goldConfig.jevModelId);
+  readonly name = process.env.JEV_MODEL_ID || goldConfig.jevModelId;
+  private model = typeSafeAi.evaluationModel(this.name);
 
   async decide(state: GoldState): Promise<GoldDecision> {
     const t0 = performance.now();
@@ -57,4 +57,10 @@ export class GoldJevModel implements GoldModel {
   }
 }
 
-export const createGoldModel = (): GoldModel => (goldConfig.model === "jev" ? new GoldJevModel() : new GoldMockModel());
+/** Read GOLD_MODEL at call time so Worker applyWorkerEnv wins over import-time config. */
+export function goldModelKind(env: Record<string, string | undefined> = process.env): "mock" | "jev" {
+  const raw = env.GOLD_MODEL ?? env.MODEL ?? goldConfig.model;
+  return raw === "jev" ? "jev" : "mock";
+}
+
+export const createGoldModel = (): GoldModel => (goldModelKind() === "jev" ? new GoldJevModel() : new GoldMockModel());

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { GOLD_QUESTIONS, goldDecisionFromEvaluate } from "./model";
+import { GOLD_QUESTIONS, goldDecisionFromEvaluate, goldModelKind } from "./model";
 
 test("Jev buy choice maps to a gold buy decision", () => {
   const d = goldDecisionFromEvaluate("buy", { buy: 0.72, sell: 0.28 }, 94, 1200);
@@ -42,4 +42,10 @@ test("gold Jev questions ask for a small scalp, not a swing hold", () => {
   expect(q.instructions.goal).toMatch(/Do not hold for a large trend/);
   expect(blob).not.toContain("\u2013");
   expect(blob).not.toContain("\u2014");
+});
+
+test("GOLD_MODEL=jev selects Jev at call time even if MODEL is mock", () => {
+  expect(goldModelKind({ GOLD_MODEL: "jev", MODEL: "mock" })).toBe("jev");
+  expect(goldModelKind({ MODEL: "mock" })).toBe("mock");
+  expect(goldModelKind({ GOLD_MODEL: "mock", MODEL: "jev" })).toBe("mock");
 });
