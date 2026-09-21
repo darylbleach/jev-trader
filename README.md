@@ -33,7 +33,7 @@ To execute on a broker and copy to follower accounts, attach the EAs in `mt5/`. 
 
 ## Cloudflare gold demo (shareable)
 
-Live now: [https://jev-gold-demo.darylbleach.workers.dev](https://jev-gold-demo.darylbleach.workers.dev). That is the XAUUSD page only, not the Kuru MON-USDC bot. Send that link. It fits a phone (stacked cards, no sideways scroll) and a desktop. Workers cron cannot tick every second, so a Durable Object alarm pulls the live gold spot once a second while someone is watching. The public deploy defaults to `GOLD_MODEL=mock` so it runs without a TypeSafe key. Jev is optional: put `TYPESAFE_AI_API_KEY` as a Worker secret and set `GOLD_MODEL` to `jev`.
+Live now: [https://jev-gold-demo.darylbleach.workers.dev](https://jev-gold-demo.darylbleach.workers.dev). That is the XAUUSD page only, not the Kuru MON-USDC bot. Send that link. It fits a phone (stacked cards, no sideways scroll) and a desktop. Workers cron cannot tick every second, so a Durable Object alarm pulls the live gold spot once a second while someone is watching. The public deploy runs `GOLD_MODEL=jev` so Jev decides buy or sell from the live XAUUSD spot. Put `TYPESAFE_AI_API_KEY` as a Worker secret only. Never put that key in wrangler vars, git, or the Worker page.
 
 `/` and `/demo` are the dashboard. `/status` `/signal` `/events` `/tick` `/fill` are the same gold API as `bun run gold`.
 
@@ -45,14 +45,13 @@ npx wrangler login
 npx wrangler deploy
 ```
 
-Optional Jev on the hosted demo:
+Hosted Jev needs the TypeSafe secret (never a wrangler var):
 
 ```
 npx wrangler secret put TYPESAFE_AI_API_KEY
-npx wrangler secret put GOLD_MODEL
 ```
 
-When prompted for `GOLD_MODEL`, enter `jev`. Local preview: `npx wrangler dev` then open `http://127.0.0.1:8787`.
+`GOLD_MODEL` is `jev` in wrangler vars. Local preview: `npx wrangler dev` then open `http://127.0.0.1:8787`.
 
 ## Endpoints
 

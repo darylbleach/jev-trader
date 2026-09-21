@@ -317,4 +317,4 @@ They do not retry a missed `seq`. The next new `seq` is the next trade. A brief 
 
 **Leader and follower disagree.** Different brokers, different spreads, different `seq` arrival times. This is a signal copier. If `InpServer` differs, they are not on the same host.
 
-**Want Jev on the Cloudflare demo.** That is optional and separate: `npx wrangler secret put TYPESAFE_AI_API_KEY` and set `GOLD_MODEL` to `jev`. Still not a production signal host.
+**Jev on the Cloudflare demo.** The public Worker already runs `GOLD_MODEL=jev` on the live XAUUSD spot. `TYPESAFE_AI_API_KEY` is a Worker secret only. Still not a production signal host.

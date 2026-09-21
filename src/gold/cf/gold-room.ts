@@ -8,6 +8,7 @@ const IDLE_MS = 15 * 60_000;
  * One shared XAUUSD demo room so every viewer sees the same tape.
  * A Durable Object alarm pulls the live gold spot every GOLD_INTERVAL_MS (1s).
  * Cron cannot do that: Workers cron is once a minute at best.
+ * GOLD_MODEL=jev boots GoldJevModel via createGoldModel after applyWorkerEnv.
  */
 export class GoldRoom extends DurableObject<Env> {
   private trader: GoldHttpTrader | null = null;
@@ -56,10 +57,10 @@ export class GoldRoom extends DurableObject<Env> {
   private async boot(): Promise<GoldHttpTrader> {
     applyWorkerEnv(this.env as unknown as Record<string, unknown>);
     if (this.trader && this.meta) return this.trader;
-    const { GoldMockModel } = await import("../model-mock");
-    const { GoldTrader } = await import("../trader");
     const { goldConfig } = await import("../config");
-    const model = new GoldMockModel();
+    const { GoldTrader } = await import("../trader");
+    const { createGoldModel } = await import("../model");
+    const model = createGoldModel();
     const trader = new GoldTrader(model);
     this.intervalMs = goldConfig.intervalMs > 0 ? goldConfig.intervalMs : 1000;
     this.refreshMs = goldConfig.spotRefreshMs > 0 ? goldConfig.spotRefreshMs : 5000;
