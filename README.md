@@ -25,7 +25,7 @@ Opens a gold-only process on `GOLD_PORT` (default 3001) with a live demo page at
 
 This gold process is a small in-out scalp, not a swing hold. Jev is asked about a short near-term move (`GOLD_HORIZON_MS` default 6000, about 6 seconds) and answers about once a second (`GOLD_INTERVAL_MS`). An opposite signal closes and flips (`GOLD_REVERSE=true`).
 
-`GET /signal` always includes `slPoints` and `tpPoints` (defaults 600 and 800, or `GOLD_SL_POINTS` / `GOLD_TP_POINTS`). On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $6 stop loss and $8 take profit, well above a typical ~15 pip / $0.15 spread. The MT5 EAs attach both on every new gold market order so each scalp can exit.
+`GET /signal` always includes `slPoints` and `tpPoints` (defaults 80 and 120, or `GOLD_SL_POINTS` / `GOLD_TP_POINTS`). On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $0.80 stop loss and $1.20 take profit, still above a typical ~15 pip / $0.15 spread. The MT5 EAs attach both on every new gold market order so each scalp can take a small win or cut, instead of sitting for a multi dollar move.
 
 Dry-run (default) also simulates JevLeader tickets so the gold page can show what would happen without a broker: market open at mid, reverse close then open once the live mid has moved at least one point, flatten close only, and SL/TP exits when price touches. A flip on an unchanged spot holds the open ticket so the dummy tape does not scratch at $0. Open ticket, recent dummy trades, and running P and L are on `GET /status` and the demo page under MT5 dummy (simulated, not a live broker). Dummy fills reuse `POST /fill` internally and the existing SSE `fill` events. Set `GOLD_DUMMY_MT5=false` to turn that off, or `GOLD_DRY_RUN=false` when a real EA posts `/fill`.
 

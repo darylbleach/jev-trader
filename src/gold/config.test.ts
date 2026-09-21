@@ -1,16 +1,15 @@
 import { expect, test } from "bun:test";
 import { GOLD_DEFAULT_HORIZON_MS, GOLD_DEFAULT_SL_POINTS, GOLD_DEFAULT_TP_POINTS, goldConfig, parsePositiveInt } from "./config";
 
-test("gold SL and TP defaults are a tight scalp exit at SYMBOL_POINT 0.01", () => {
-  expect(GOLD_DEFAULT_SL_POINTS).toBe(600);
-  expect(GOLD_DEFAULT_TP_POINTS).toBe(800);
-  expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBe(6);
-  expect(GOLD_DEFAULT_TP_POINTS * 0.01).toBe(8);
+test("gold SL and TP defaults are a quick scalp, not a multi dollar hold", () => {
+  expect(GOLD_DEFAULT_SL_POINTS).toBe(80);
+  expect(GOLD_DEFAULT_TP_POINTS).toBe(120);
+  expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBeCloseTo(0.8);
+  expect(GOLD_DEFAULT_TP_POINTS * 0.01).toBeCloseTo(1.2);
   expect(GOLD_DEFAULT_TP_POINTS).toBeGreaterThan(GOLD_DEFAULT_SL_POINTS);
-  expect(GOLD_DEFAULT_SL_POINTS).toBeGreaterThanOrEqual(500);
-  expect(GOLD_DEFAULT_SL_POINTS).toBeLessThanOrEqual(800);
-  expect(GOLD_DEFAULT_TP_POINTS).toBeGreaterThanOrEqual(600);
-  expect(GOLD_DEFAULT_TP_POINTS).toBeLessThanOrEqual(1000);
+  expect(GOLD_DEFAULT_SL_POINTS).toBeGreaterThan(15);
+  expect(GOLD_DEFAULT_SL_POINTS).toBeLessThanOrEqual(150);
+  expect(GOLD_DEFAULT_TP_POINTS).toBeLessThanOrEqual(200);
   expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBeGreaterThan(0.15);
 });
 

@@ -80,8 +80,8 @@ A signal looks like this (fields that matter to the EAs):
       "action": "buy",
       "position": "buy",
       "lot": 0.01,
-      "slPoints": 600,
-      "tpPoints": 800,
+      "slPoints": 80,
+      "tpPoints": 120,
       "spreadOk": true,
       "mid": 4341.5,
       "bid": 4341.42,
@@ -90,7 +90,7 @@ A signal looks like this (fields that matter to the EAs):
 
 `seq` is how the EAs know something new happened. They ignore a repeat of the same `seq` and `action`. `ts` must be fresh (`InpMaxAgeMs`, default 5000). `spreadOk` is false when the quote is too wide (`GOLD_MAX_SPREAD_PIPS`, default 30). Both EAs fail closed on a stale `ts`, a wide spread, or an HTTP error.
 
-`slPoints` / `tpPoints` default to 600 / 800. On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $6 stop loss and $8 take profit. Every new market order always gets both. The EAs also raise the distance to `SYMBOL_TRADE_STOPS_LEVEL` so the broker does not reject the order.
+`slPoints` / `tpPoints` default to 80 / 120. On a 2-decimal gold quote (`SYMBOL_POINT` 0.01) that is $0.80 stop loss and $1.20 take profit. Every new market order always gets both, so a scalp takes a small win or cuts instead of sitting for a multi dollar move. The EAs also raise the distance to `SYMBOL_TRADE_STOPS_LEVEL` so the broker does not reject the order.
 
 Netting-style: one side at a time. Opposite signal closes, then opens, when `GOLD_REVERSE=true` (default). No pyramiding.
 
@@ -121,8 +121,8 @@ This live spot is not your broker's XAUUSD bid/ask. Broker gold is a CFD. Spread
         GOLD_DEMO=false
         GOLD_PORT=3001
         GOLD_LOT=0.01
-        GOLD_SL_POINTS=600
-        GOLD_TP_POINTS=800
+        GOLD_SL_POINTS=80
+        GOLD_TP_POINTS=120
 
 4. Start it and keep it running (`tmux`, `systemd`, or similar):
 
@@ -174,8 +174,8 @@ Attach `JevLeader` to an XAUUSD / GOLD / XAUUSDm chart on the account that shoul
 | `InpLot` | `0.01` | used only if the signal lot is missing |
 | `InpSlippage` | `30` | points |
 | `InpMagic` | `210921` | marks leader tickets. Do not reuse on a follower |
-| `InpSLPoints` | `600` | $6 on a 0.01 point gold quote. 0 means "use the signal" |
-| `InpTPPoints` | `800` | $8 on a 0.01 point gold quote. 0 means "use the signal" |
+| `InpSLPoints` | `80` | $0.80 on a 0.01 point gold quote. 0 means "use the signal" |
+| `InpTPPoints` | `120` | $1.20 on a 0.01 point gold quote. 0 means "use the signal" |
 | `InpMaxSpreadPips` | `30` | fail closed if the broker spread is wider |
 | `InpMaxAgeMs` | `5000` | fail closed if `/signal` is older than this |
 | `InpTimeoutMs` | `2000` | WebRequest timeout |
@@ -190,7 +190,7 @@ Every ~200 ms the leader:
 5. On a new `seq`, opens, reverses, or flattens to match `position`.
 6. After a fill, POSTs `/fill` so the dashboard can show the real ticket.
 
-SL/TP on the new order: EA input if > 0, else signal points, else 600 / 800, then clamp to `SYMBOL_TRADE_STOPS_LEVEL`. Confirm the attached SL and TP on the ticket in the Trade tab. If they are missing, the broker rejected stops and the scalp may not close.
+SL/TP on the new order: EA input if > 0, else signal points, else 80 / 120, then clamp to `SYMBOL_TRADE_STOPS_LEVEL`. Confirm the attached SL and TP on the ticket in the Trade tab. If they are missing, the broker rejected stops and the scalp may not close. If a chart was already attached with the old 600 / 800 inputs, reset those inputs or the EA will keep the wider stops.
 
 Experts log on attach should print `JevLeader symbol=... server=... sl=... tp=...`.
 
@@ -207,7 +207,7 @@ Attach `JevFollower` to the same symbol family on each copy account. Many follow
 | `InpMinLot` | `0.01` | do not open if rounding falls below this |
 | `InpMaxLot` | `1.0` | hard cap after scaling |
 | `InpMagic` | `210922` | different from the leader on purpose |
-| `InpSLPoints` / `InpTPPoints` | `600` / `800` | same resolve rule as the leader |
+| `InpSLPoints` / `InpTPPoints` | `80` / `120` | same resolve rule as the leader |
 | `InpMaxSpreadPips` / `InpMaxAgeMs` | `30` / `5000` | same fail-closed rules |
 
 Lot math (same as `scaleLots` in `src/gold/policy.ts`):
@@ -278,8 +278,8 @@ They do not retry a missed `seq`. The next new `seq` is the next trade. A brief 
 | `GOLD_HORIZON_MS` | `6000` | look-ahead window |
 | `GOLD_LOT` | `0.01` | leader signal lot |
 | `GOLD_MAX_LOT` | `1` | server-side cap |
-| `GOLD_SL_POINTS` | `600` | rides on `/signal` |
-| `GOLD_TP_POINTS` | `800` | rides on `/signal` |
+| `GOLD_SL_POINTS` | `80` | rides on `/signal` |
+| `GOLD_TP_POINTS` | `120` | rides on `/signal` |
 | `GOLD_REVERSE` | `true` | flip on opposite signal |
 | `GOLD_MAX_SPREAD_PIPS` | `30` | `spreadOk` threshold |
 | `XAUUSD_FEED_URL` | unset | leave unset in production |

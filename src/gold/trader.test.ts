@@ -36,8 +36,8 @@ test("signal carries non-zero SL and TP points from gold config", async () => {
   const snap = trader.snapshot();
   expect(s?.slPoints).toBe(snap.slPoints);
   expect(s?.tpPoints).toBe(snap.tpPoints);
-  expect(snap.slPoints).toBe(600);
-  expect(snap.tpPoints).toBe(800);
+  expect(snap.slPoints).toBe(80);
+  expect(snap.tpPoints).toBe(120);
   expect(snap.horizonMs).toBe(6000);
 });
 
