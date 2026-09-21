@@ -105,6 +105,53 @@ test("mid between SL and TP leaves the ticket open", () => {
   expect(acct.openTicket?.side).toBe("buy");
 });
 
+test("realized plus floating is combined pnl and last ticket keeps the close", () => {
+  const acct = new DummyMt5Account(opts);
+  acct.sync("buy", 2650, 1);
+  acct.sync("sell", 2651, 2);
+  expect(acct.lastTicket?.pnl).toBeCloseTo(1);
+  expect(acct.winCount).toBe(1);
+  expect(acct.lossCount).toBe(0);
+  expect(acct.floatingPnl(2652)).toBeCloseTo(-1);
+  const snap = acct.snapshot(2652);
+  expect(snap.realizedUsd).toBeCloseTo(1);
+  expect(snap.unrealizedUsd).toBeCloseTo(-1);
+  expect(snap.pnlUsd).toBeCloseTo(0);
+  expect(snap.wins).toBe(1);
+  expect(snap.losses).toBe(0);
+  expect(snap.lastTicket?.reason).toBe("signal");
+});
+
+test("a stop loss is a loss and a take profit is a win", () => {
+  const acct = new DummyMt5Account(opts);
+  acct.sync("buy", 2650, 1);
+  acct.checkStops(2644, 2);
+  expect(acct.winCount).toBe(0);
+  expect(acct.lossCount).toBe(1);
+  acct.sync("sell", 2644, 3);
+  acct.checkStops(2636, 4);
+  expect(acct.lastTicket?.reason).toBe("tp");
+  expect(acct.lastTicket?.pnl).toBeCloseTo(8);
+  expect(acct.winCount).toBe(1);
+  expect(acct.lossCount).toBe(1);
+  expect(acct.realizedPnl).toBeCloseTo(2);
+});
+
+test("scratch close is neither a win nor a loss", () => {
+  const acct = new DummyMt5Account(opts);
+  acct.sync("buy", 2650, 1);
+  acct.sync("flat", 2650, 2);
+  expect(acct.lastTicket?.pnl).toBeCloseTo(0);
+  expect(acct.winCount).toBe(0);
+  expect(acct.lossCount).toBe(0);
+});
+
+test("1.00 lot and a $1 gold move is $100", () => {
+  expect(ticketPnl("buy", 2000, 2001, 1, 100)).toBeCloseTo(100);
+  expect(ticketPnl("sell", 2000, 2001, 1, 100)).toBeCloseTo(-100);
+  expect(ticketPnl("buy", 2000, 2001, 0, 100)).toBeCloseTo(0);
+});
+
 test("parseFill keeps dummy close fields and still accepts a broker ticket", () => {
   const dummy = parseFill({
     ticket: 7,

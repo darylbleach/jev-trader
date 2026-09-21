@@ -63,6 +63,55 @@ test("a later tick after the interval decides again", async () => {
   expect(trader.snapshot().position).toBe("sell");
 });
 
+function dummyAccount(): DummyMt5Account {
+  return new DummyMt5Account({
+    lot: 0.01,
+    slPoints: 600,
+    tpPoints: 800,
+    point: 0.01,
+    contractSize: 100,
+    historySize: 20,
+  });
+}
+
+test("dry-run snapshot exposes realized, open, total, and last ticket pnl", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), dummyAccount());
+  await trader.onTick({ bid: 2650, ask: 2650.2 }, 1_000);
+  const open = trader.snapshot();
+  expect(open.simulated).toBe(true);
+  expect(open.openTicket?.side).toBe("buy");
+  expect(open.unrealizedUsd).toBeCloseTo(0);
+  expect(open.totals.unrealizedUsd).toBeCloseTo(0);
+  expect(open.dummyPnl.totalUsd).toBeCloseTo(0);
+
+  const model = new FixedModel("buy");
+  const flip = new GoldTrader(model, dummyAccount());
+  await flip.onTick({ bid: 2650, ask: 2650 }, 1_000);
+  model.action = "sell";
+  await flip.onTick({ bid: 2651.5, ask: 2651.5 }, 2_000);
+  const snap = flip.snapshot();
+  expect(snap.realizedUsd).toBeCloseTo(1.5);
+  expect(snap.unrealizedUsd).toBeCloseTo(0);
+  expect(snap.pnlUsd).toBeCloseTo(1.5);
+  expect(snap.wins).toBe(1);
+  expect(snap.losses).toBe(0);
+  expect(snap.lastTicket?.pnl).toBeCloseTo(1.5);
+  expect(snap.totals.realizedUsd).toBeCloseTo(1.5);
+  expect(snap.totals.pnlUsd).toBeCloseTo(1.5);
+  expect(snap.dummyPnl.wins).toBe(1);
+});
+
+test("a late tick still marks dummy open pnl", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), dummyAccount());
+  await trader.onTick({ bid: 2650, ask: 2650 }, 1_000);
+  await trader.onTick({ bid: 2651, ask: 2651 }, 1_100);
+  const snap = trader.snapshot();
+  expect(snap.totals.lateTicks).toBe(1);
+  expect(snap.openTicket?.side).toBe("buy");
+  expect(snap.unrealizedUsd).toBeCloseTo(1);
+  expect(trader.history.at(-1)?.pnl?.unrealizedUsd).toBeCloseTo(1);
+});
+
 const dummyOpts = {
   lot: 0.01,
   slPoints: 600,

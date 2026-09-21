@@ -86,16 +86,37 @@ interface Snapshot {
   feed?: string;
   latest: GoldSignal | null;
   horizonMs?: number;
-  totals: { ticks: number; decisions: number; lateTicks: number; fills: number; jevUsd: number };
+  totals: {
+    ticks: number;
+    decisions: number;
+    lateTicks: number;
+    fills: number;
+    jevUsd: number;
+    realizedUsd?: number;
+    unrealizedUsd?: number;
+    pnlUsd?: number;
+    wins?: number;
+    losses?: number;
+  };
   error?: string | null;
   history?: GoldEvent[];
+  realizedUsd?: number;
+  unrealizedUsd?: number;
+  pnlUsd?: number;
+  wins?: number;
+  losses?: number;
+  lastTicket?: DummyTrade | null;
   openTicket?: DummyTicket | null;
   dummyTrades?: DummyTrade[];
   dummyPnl?: {
     realized?: number;
     floating?: number;
+    total?: number;
     realizedUsd?: number;
     unrealizedUsd?: number;
+    totalUsd?: number;
+    wins?: number;
+    losses?: number;
   };
 }
 
@@ -139,11 +160,19 @@ function applySnapshot(s: Snapshot): void {
   if (s.dummyTrades) {
     dummyTape.length = 0;
     dummyTape.push(...s.dummyTrades);
+    lastTicket = dummyTape.at(-1) ?? null;
+    seenFills.clear();
+    for (const t of dummyTape) {
+      seenFills.add(`${t.ticket}|close|${t.closePrice}|${t.reason}|${t.closeTs}`);
+    }
   }
-  if (s.dummyPnl) {
+  if (s.lastTicket !== undefined) lastTicket = s.lastTicket;
+  if (s.dummyPnl || typeof s.realizedUsd === "number") {
     dummyPnl = {
-      realized: s.dummyPnl.realized ?? s.dummyPnl.realizedUsd ?? 0,
-      floating: s.dummyPnl.floating ?? s.dummyPnl.unrealizedUsd ?? 0,
+      realized: s.dummyPnl?.realized ?? s.dummyPnl?.realizedUsd ?? s.realizedUsd ?? s.totals?.realizedUsd ?? 0,
+      floating: s.dummyPnl?.floating ?? s.dummyPnl?.unrealizedUsd ?? s.unrealizedUsd ?? s.totals?.unrealizedUsd ?? 0,
+      wins: s.dummyPnl?.wins ?? s.wins ?? s.totals?.wins ?? dummyTape.filter((t) => t.pnl > 0).length,
+      losses: s.dummyPnl?.losses ?? s.losses ?? s.totals?.losses ?? dummyTape.filter((t) => t.pnl < 0).length,
     };
   }
   if (s.history) {
@@ -208,14 +237,79 @@ function renderStats(): void {
     ["SPREAD", latest ? `${latest.spreadPips.toFixed(1)} pips` : "-"],
     ["SL", exitLabel(latest?.slPoints)],
     ["TP", exitLabel(latest?.tpPoints)],
-    ["DUMMY PNL", money(dummyPnl.realized + dummyPnl.floating)],
+    ["WINS", String(dummyPnl.wins)],
+    ["LOSSES", String(dummyPnl.losses)],
   ];
   el.innerHTML = cells.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 }
 
 function money(n: number): string {
-  const sign = n > 0 ? "+" : "";
-  return `${sign}${n.toFixed(2)}`;
+  const abs = Math.abs(n).toFixed(2);
+  if (n > 0) return `+$${abs}`;
+  if (n < 0) return `-$${abs}`;
+  return "$0.00";
+}
+
+function tone(n: number): string {
+  return n > 0 ? "up" : n < 0 ? "down" : "";
+}
+
+function closeVerb(reason: DummyTrade["reason"]): string {
+  switch (reason) {
+    case "sl":
+      return "SL";
+    case "tp":
+      return "TP";
+    case "signal":
+      return "CLOSE";
+    default: {
+      const _never: never = reason;
+      return _never;
+    }
+  }
+}
+
+function applyPnL(p: DummyPnL): void {
+  dummyPnl.realized = p.realizedUsd;
+  dummyPnl.floating = p.unrealizedUsd;
+  dummyPnl.wins = p.wins;
+  dummyPnl.losses = p.losses;
+}
+
+function renderPnL(): void {
+  const band = $("pnlBand");
+  if (band) band.style.display = dummyEnabled ? "" : "none";
+  const realized = dummyPnl.realized;
+  const open = dummyPnl.floating;
+  const total = realized + open;
+  const realizedEl = $("pnlRealized");
+  if (realizedEl) {
+    realizedEl.textContent = money(realized);
+    realizedEl.className = `pnl-v ${tone(realized)}`;
+  }
+  const openEl = $("pnlOpen");
+  if (openEl) {
+    openEl.textContent = money(open);
+    openEl.className = `pnl-v ${tone(open)}`;
+  }
+  const totalEl = $("pnlTotal");
+  if (totalEl) {
+    totalEl.textContent = money(total);
+    totalEl.className = `pnl-v ${tone(total)}`;
+  }
+  const lastEl = $("lastTicket");
+  if (lastEl) {
+    if (lastTicket) {
+      lastEl.textContent = `last ticket #${lastTicket.ticket} ${lastTicket.side.toUpperCase()} ${closeVerb(lastTicket.reason)} ${money(lastTicket.pnl)}`;
+      lastEl.className = `last-ticket ${tone(lastTicket.pnl)}`;
+    } else if (openTicket) {
+      lastEl.textContent = `open ticket #${openTicket.ticket} ${openTicket.side.toUpperCase()} ${money(dummyPnl.floating)}`;
+      lastEl.className = `last-ticket ${tone(dummyPnl.floating)}`;
+    } else {
+      lastEl.textContent = "no dummy result yet";
+      lastEl.className = "last-ticket";
+    }
+  }
 }
 
 function renderDummy(): void {
@@ -224,9 +318,11 @@ function renderDummy(): void {
   const note = $("dummyNote");
   if (note) {
     note.textContent = dummyEnabled
-      ? "Simulated tickets. Not a live broker. Shows what JevLeader would open and close on XAUUSD."
+      ? "Simulated tickets. Not a live broker. Shows what JevLeader would open and close on XAUUSD, with profit or loss on every close."
       : "Dummy MT5 is off. Attach the real EAs to see broker fills.";
   }
+  const record = $("dummyRecord");
+  if (record) record.textContent = `W ${dummyPnl.wins}  L ${dummyPnl.losses}`;
   const open = $("dummyOpen");
   if (open) {
     if (!openTicket) {
@@ -234,23 +330,19 @@ function renderDummy(): void {
       open.className = "dummy-open";
     } else {
       const t = openTicket;
-      open.innerHTML = `<span class="${t.side}">${t.side.toUpperCase()} in</span> #${t.ticket}  ${t.lots} lot @ ${t.openPrice.toFixed(2)}  SL ${t.sl.toFixed(2)}  TP ${t.tp.toFixed(2)}`;
+      open.innerHTML = `<span class="${t.side}">${t.side.toUpperCase()} in</span> #${t.ticket}  ${t.lots} lot @ ${t.openPrice.toFixed(2)}  SL ${t.sl.toFixed(2)}  TP ${t.tp.toFixed(2)}  open ${money(dummyPnl.floating)}`;
       open.className = `dummy-open ${t.side}`;
     }
   }
-  const pnlEl = $("dummyPnlValue");
-  if (pnlEl) {
-    const total = dummyPnl.realized + dummyPnl.floating;
-    pnlEl.textContent = `${money(total)}  (open ${money(dummyPnl.floating)})`;
-    pnlEl.className = `v ${total > 0 ? "up" : total < 0 ? "down" : ""}`;
-  }
   const tapeEl = $("dummyTape");
-  if (!tapeEl) return;
-  const rows = [...dummyTape].reverse().slice(0, 16).map((t) => {
-    const verb = t.reason === "sl" ? "SL" : t.reason === "tp" ? "TP" : "CLOSE";
-    return `<div class="row"><span>#${t.ticket}</span><span class="${t.side}">${t.side.toUpperCase()} in</span><span>${t.openPrice.toFixed(2)}</span><span class="${t.reason}">${verb} ${t.closePrice.toFixed(2)}</span><span class="${t.pnl >= 0 ? "up" : "down"}">${money(t.pnl)}</span></div>`;
-  });
-  tapeEl.innerHTML = rows.join("") || `<div class="row"><span></span><span></span><span>no dummy trades yet</span><span></span><span></span></div>`;
+  if (tapeEl) {
+    const rows = [...dummyTape].reverse().slice(0, 16).map((t) => {
+      const verb = closeVerb(t.reason);
+      return `<div class="row"><span>#${t.ticket}</span><span class="${t.side}">${t.side.toUpperCase()} in</span><span>${t.openPrice.toFixed(2)}</span><span class="${t.reason}">${verb} ${t.closePrice.toFixed(2)}</span><span class="${tone(t.pnl)}">${money(t.pnl)}</span></div>`;
+    });
+    tapeEl.innerHTML = rows.join("") || `<div class="row"><span></span><span></span><span>no dummy trades yet</span><span></span><span></span></div>`;
+  }
+  renderPnL();
 }
 
 function fillKey(f: GoldFill): string {
@@ -288,8 +380,11 @@ function onFill(f: GoldFill): void {
     };
     dummyTape.push(trade);
     if (dummyTape.length > 40) dummyTape.shift();
-    dummyPnl.realized += trade.pnl;
+    dummyPnl.realized = dummyTape.reduce((sum, row) => sum + row.pnl, 0);
+    dummyPnl.wins = dummyTape.filter((row) => row.pnl > 0).length;
+    dummyPnl.losses = dummyTape.filter((row) => row.pnl < 0).length;
     dummyPnl.floating = 0;
+    lastTicket = trade;
     openTicket = null;
   }
   if (openTicket && latestMid) {
@@ -353,7 +448,11 @@ function onEvent(e: GoldEvent): void {
     renderTape();
   }
   if (e.fill) onFill(e.fill);
-  else if (openTicket) {
+  else if (e.pnl) {
+    applyPnL(e.pnl);
+    if (e.lastTicket !== undefined) lastTicket = e.lastTicket;
+    renderDummy();
+  } else if (openTicket) {
     const dir = openTicket.side === "buy" ? 1 : -1;
     dummyPnl.floating = (e.mid - openTicket.openPrice) * dir * 100 * openTicket.lots;
     renderDummy();
@@ -378,6 +477,8 @@ function connect(): void {
     const data = JSON.parse((ev as MessageEvent).data) as GoldEvent | GoldFill;
     if (data && typeof data === "object" && "fill" in data && data.fill) {
       latestMid = typeof data.mid === "number" ? data.mid : latestMid;
+      if (data.pnl) applyPnL(data.pnl);
+      if (data.lastTicket !== undefined) lastTicket = data.lastTicket;
       onFill(data.fill);
       return;
     }
