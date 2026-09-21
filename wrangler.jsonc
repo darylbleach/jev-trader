@@ -26,7 +26,7 @@
     "GOLD_INTERVAL_MS": "1000",
     "GOLD_HORIZON_MS": "6000",
     "GOLD_LOT": "0.01",
-    "GOLD_SL_POINTS": "40",
+    "GOLD_SL_POINTS": "100",
     "GOLD_TP_POINTS": "60",
     "GOLD_REVERSE": "true",
     "XAUUSD_SPOT_URL": "https://api.gold-api.com/price/XAU",
