@@ -108,3 +108,22 @@ test("GET /export returns the proof blob", async () => {
   expect(body.version).toBe(1);
   expect(body.position).toBe("flat");
 });
+
+test("POST /resume clears the entry pause", async () => {
+  let paused = true;
+  const trader = fakeTrader({
+    resumeEntries() {
+      paused = false;
+      return { ok: true as const, entriesPaused: paused, realizedUsd: -22 };
+    },
+  });
+  const hub = createSseHub();
+  const missing = await handleGoldHttp(new Request("https://demo.test/resume", { method: "POST" }), fakeTrader(), meta, hub);
+  expect(missing.status).toBe(501);
+  const res = await handleGoldHttp(new Request("https://demo.test/resume", { method: "POST" }), trader, meta, hub);
+  expect(res.status).toBe(200);
+  const body = await res.json() as { ok: boolean; entriesPaused: boolean; realizedUsd: number };
+  expect(body.ok).toBe(true);
+  expect(body.entriesPaused).toBe(false);
+  expect(body.realizedUsd).toBe(-22);
+});

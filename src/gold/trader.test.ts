@@ -36,10 +36,11 @@ test("signal carries non-zero SL and TP points from gold config", async () => {
   const snap = trader.snapshot();
   expect(s?.slPoints).toBe(snap.slPoints);
   expect(s?.tpPoints).toBe(snap.tpPoints);
-  expect(snap.slPoints).toBe(200);
-  expect(snap.tpPoints).toBe(100);
+  expect(snap.slPoints).toBe(300);
+  expect(snap.tpPoints).toBe(200);
   expect(snap.horizonMs).toBe(6000);
   expect(snap.fillMode).toBe("book");
+  expect(snap.pauseRealizedUsd).toBe(-20);
 });
 
 test("overlapping ticks mark late and keep the last signal", async () => {
@@ -231,4 +232,54 @@ test("dummy MT5 can be disabled", async () => {
   expect(snap.dummyMt5).toBe(false);
   expect(snap.openTicket).toBeNull();
   expect(snap.totals.fills).toBe(0);
+});
+
+test("drawdown pause blocks new entries until POST resume", async () => {
+  const loss: import("./types").DummyTrade = {
+    ticket: 1,
+    side: "buy",
+    lots: 0.01,
+    openPrice: 2650,
+    sl: 2648,
+    tp: 2652,
+    closePrice: 2648,
+    reason: "sl",
+    pnl: -20,
+    openTs: 1,
+    closeTs: 2,
+  };
+  const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+  trader.hydrateProof({
+    version: 1,
+    savedAt: 1,
+    startedAt: 1,
+    seq: 0,
+    position: "flat",
+    totals: { ticks: 0, decisions: 0, lateTicks: 0, fills: 0, jevUsd: 0 },
+    dummy: {
+      nextTicket: 2,
+      open: null,
+      trades: [loss],
+      realized: -20,
+      wins: 0,
+      losses: 1,
+      last: loss,
+    },
+  });
+  expect(trader.snapshot().realizedUsd).toBe(-20);
+  expect(trader.snapshot().entriesPaused).toBe(true);
+
+  await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);
+  expect(trader.snapshot().openTicket).toBeNull();
+  expect(trader.snapshot().position).toBe("flat");
+  expect(trader.snapshot().entriesPaused).toBe(true);
+
+  const resumed = trader.resumeEntries();
+  expect(resumed.ok).toBe(true);
+  expect(resumed.entriesPaused).toBe(false);
+  expect(trader.snapshot().entriesPaused).toBe(false);
+
+  await trader.onTick({ bid: 2650, ask: 2650.5 }, 2_000);
+  expect(trader.snapshot().openTicket?.side).toBe("buy");
+  expect(trader.snapshot().entriesPaused).toBe(false);
 });

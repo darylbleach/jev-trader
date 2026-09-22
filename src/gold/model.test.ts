@@ -40,11 +40,12 @@ test("gold Jev questions ask for a small scalp, not a swing hold", () => {
   expect(q.criteria.buy).toMatch(/Do not wait for a large uptrend/);
   expect(q.criteria.sell).toMatch(/Do not wait for a large downtrend/);
   expect(q.instructions.goal).toMatch(/Do not hold for a large trend/);
+  expect(blob).toContain("$3.00");
   expect(blob).toContain("$2.00");
-  expect(blob).toContain("$1.00");
   expect(blob).toContain("small bounce");
   expect(blob).not.toContain("$0.40");
   expect(blob).not.toContain("$0.60");
+  expect(blob).not.toContain("$1.00");
   expect(blob).not.toContain("\u2013");
   expect(blob).not.toContain("\u2014");
 });
