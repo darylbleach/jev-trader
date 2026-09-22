@@ -19,6 +19,16 @@ export interface GoldHttpTrader {
   exportProof?(now?: number): unknown;
   pauseEntries?(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason?: "drawdown" | "floor" | "manual" | null };
   resumeEntries?(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason?: "drawdown" | "floor" | "manual" | null };
+  resetSession?(now?: number): {
+    ok: true;
+    startedAt: number;
+    wins: number;
+    losses: number;
+    realizedUsd: number;
+    entriesPaused: boolean;
+    entriesForcePaused: boolean;
+    openTicket: unknown;
+  };
 }
 
 export const CORS = {
@@ -140,6 +150,24 @@ export async function handleGoldHttp(
   if (pathname === "/resume" && request.method === "POST") {
     if (typeof trader.resumeEntries !== "function") return json({ error: "resume unavailable" }, 501);
     return json(trader.resumeEntries());
+  }
+  if ((pathname === "/reset" || pathname === "/session/reset") && request.method === "POST") {
+    if (typeof trader.resetSession !== "function") return json({ error: "reset unavailable" }, 501);
+    let body: unknown = null;
+    try {
+      const text = await request.text();
+      body = text.trim() ? JSON.parse(text) : null;
+    } catch {
+      return json({ error: "invalid json" }, 400);
+    }
+    const confirm =
+      body && typeof body === "object" && "confirm" in body
+        ? String((body as { confirm: unknown }).confirm)
+        : "";
+    if (confirm !== "wipe") {
+      return json({ error: 'confirm wipe required: POST {"confirm":"wipe"}' }, 400);
+    }
+    return json(trader.resetSession(Date.now()));
   }
   if (pathname === "/signal" && request.method === "GET") {
     const latest = trader.signal();

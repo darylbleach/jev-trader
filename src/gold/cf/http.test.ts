@@ -148,3 +148,66 @@ test("POST /pause and /entries/pause set the entry pause latch", async () => {
   const alias = await handleGoldHttp(new Request("https://demo.test/entries/pause", { method: "POST" }), trader, meta, hub);
   expect(alias.status).toBe(200);
 });
+
+test("POST /reset requires confirm wipe and clears the scored session", async () => {
+  let wiped = false;
+  const trader = fakeTrader({
+    resetSession(now = Date.now()) {
+      wiped = true;
+      return {
+        ok: true as const,
+        startedAt: now,
+        wins: 0,
+        losses: 0,
+        realizedUsd: 0,
+        entriesPaused: false,
+        entriesForcePaused: false,
+        openTicket: null,
+      };
+    },
+  });
+  const hub = createSseHub();
+  const missing = await handleGoldHttp(
+    new Request("https://demo.test/reset", {
+      method: "POST",
+      body: JSON.stringify({ confirm: "wipe" }),
+    }),
+    fakeTrader(),
+    meta,
+    hub,
+  );
+  expect(missing.status).toBe(501);
+
+  const rejected = await handleGoldHttp(new Request("https://demo.test/reset", { method: "POST" }), trader, meta, hub);
+  expect(rejected.status).toBe(400);
+  expect(wiped).toBe(false);
+
+  const res = await handleGoldHttp(
+    new Request("https://demo.test/reset", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "wipe" }),
+    }),
+    trader,
+    meta,
+    hub,
+  );
+  expect(res.status).toBe(200);
+  const body = await res.json() as { ok: boolean; wins: number; realizedUsd: number; entriesForcePaused: boolean };
+  expect(body.ok).toBe(true);
+  expect(body.wins).toBe(0);
+  expect(body.realizedUsd).toBe(0);
+  expect(body.entriesForcePaused).toBe(false);
+  expect(wiped).toBe(true);
+
+  const alias = await handleGoldHttp(
+    new Request("https://demo.test/session/reset", {
+      method: "POST",
+      body: JSON.stringify({ confirm: "wipe" }),
+    }),
+    trader,
+    meta,
+    hub,
+  );
+  expect(alias.status).toBe(200);
+});

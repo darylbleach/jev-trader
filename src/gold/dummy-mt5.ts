@@ -166,6 +166,17 @@ export class DummyMt5Account {
     this.last = state.last ? { ...state.last } : null;
   }
 
+  /** Clear the scored session: open ticket, closed tape, wins/losses/realized. */
+  resetSession(): void {
+    this.nextTicket = 1;
+    this.open = null;
+    this.trades = [];
+    this.realized = 0;
+    this.wins = 0;
+    this.losses = 0;
+    this.last = null;
+  }
+
   floatingPnl(quote: BookQuote): number {
     if (!this.open) return 0;
     const mark = exitPrice(this.open.side, quote, this.fillMode);
