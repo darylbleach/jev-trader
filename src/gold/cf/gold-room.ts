@@ -3,6 +3,7 @@ import { keepGoldAlarm } from "./alarm";
 import { applyWorkerEnv } from "./env";
 import { createSseHub, handleGoldHttp, type GoldHttpTrader, type GoldMeta, type SseHub } from "./http";
 import { parseProofState, type GoldProofState } from "../proof-state";
+import { applyProofBoot, hydrationLooksIntact } from "./proof-boot";
 
 /** Durable Object storage key for closed trades, P/L, and session counters. */
 export const PROOF_STORAGE_KEY = "proof";
@@ -17,6 +18,7 @@ export const PROOF_STORAGE_KEY = "proof";
  *
  * Trade history and P/L live in DO SQLite storage under `proof`. In-memory
  * GoldTrader / DummyMt5Account alone do not survive hibernation or deploys.
+ * Boot never starts empty when the `proof` key exists (corrupt blob throws).
  */
 export class GoldRoom extends DurableObject<Env> {
   private trader: GoldHttpTrader | null = null;
@@ -92,8 +94,16 @@ export class GoldRoom extends DurableObject<Env> {
     this.refreshMs = goldConfig.spotRefreshMs > 0 ? goldConfig.spotRefreshMs : 1000;
 
     const storedProof = await this.ctx.storage.get<unknown>(PROOF_STORAGE_KEY);
-    const proof = parseProofState(storedProof);
-    if (proof) trader.hydrateProof(proof);
+    // Refuse empty boot when a proof blob exists but does not parse.
+    const bootMode = applyProofBoot(trader, storedProof);
+    if (bootMode === "hydrated") {
+      const proof = parseProofState(storedProof);
+      if (proof && !hydrationLooksIntact(proof, trader.snapshot())) {
+        throw new Error(
+          "GoldRoom proof hydrate mismatch after restore; refusing to continue with a divergent empty tape",
+        );
+      }
+    }
 
     this.meta = {
       model: model.name,
