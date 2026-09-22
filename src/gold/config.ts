@@ -1,15 +1,19 @@
 const env = (key: string, fallback?: string) => process.env[key] ?? fallback;
 
 /**
- * XAUUSD scalp stop. Many brokers quote SYMBOL_POINT 0.01, so 100 points is $1.00.
- * A live spot bounce of about $0.80 tagged a $0.40 stop and knocked out the side
- * that was about to pay. Leave room for that bounce. Still not a multi dollar hold.
+ * XAUUSD scalp stop after bid/ask fills. SYMBOL_POINT 0.01 means 250 points is $2.50.
+ * Live Swissquote-style books are often about $0.50 wide. A buy fills at ask, so the
+ * exit bid already sits about one spread toward the stop. $2.50 leaves about $2.00 of
+ * bounce room after that hit. Still a scalp, not a multi dollar hold.
  */
-export const GOLD_DEFAULT_SL_POINTS = 100;
-/** Quick take profit, closer than the stop: 60 points is $0.60. Bank the small win. */
-export const GOLD_DEFAULT_TP_POINTS = 60;
-/** Short near-term window Jev is asked about. Not a swing hold. */
-export const GOLD_DEFAULT_HORIZON_MS = 6000;
+export const GOLD_DEFAULT_SL_POINTS = 250;
+/**
+ * Take profit that clears a typical ~$0.50 spread with about $1.00 of margin:
+ * 150 points is $1.50. Dummy buys at ask / sells at bid, so the target must beat the book.
+ */
+export const GOLD_DEFAULT_TP_POINTS = 150;
+/** Short near-term window Jev is asked about. Slightly longer than the old $0.60 scalp. */
+export const GOLD_DEFAULT_HORIZON_MS = 12000;
 
 /** Env integers used for SL/TP. Zero, negative, or non-numeric values fall back so exits stay on. */
 export function parsePositiveInt(raw: string | undefined, fallback: number): number {
