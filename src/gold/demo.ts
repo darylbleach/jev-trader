@@ -121,6 +121,7 @@ interface Snapshot {
     wins?: number;
     losses?: number;
   };
+  entriesPaused?: boolean;
 }
 
 const $ = (id: string) => document.getElementById(id);
@@ -142,6 +143,7 @@ let openTicket: DummyTicket | null = null;
 let lastTicket: DummyTrade | null = null;
 let dummyPnl = { realized: 0, floating: 0, wins: 0, losses: 0 };
 let totals = { ticks: 0, decisions: 0, lateTicks: 0, fills: 0, jevUsd: 0 };
+let entriesPaused = false;
 
 function pct(n: number): string {
   return `${Math.round(n * 100)}%`;
@@ -167,6 +169,7 @@ function applySnapshot(s: Snapshot): void {
   if (s.fillMode === "book" || s.fillMode === "mid") fillMode = s.fillMode;
   if (s.totals) totals = s.totals;
   dummyEnabled = s.dummyMt5 !== false;
+  entriesPaused = s.entriesPaused === true;
   if (s.openTicket !== undefined) openTicket = s.openTicket;
   if (s.dummyTrades) {
     dummyTape.length = 0;
@@ -263,8 +266,12 @@ function renderStats(): void {
     ["TP / SL", `${tpLabel} / ${slLabel}`],
     ["WINS", String(dummyPnl.wins)],
     ["LOSSES", String(dummyPnl.losses)],
+    ["ENTRIES", entriesPaused ? "PAUSED" : "LIVE"],
   ];
-  el.innerHTML = cells.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  el.innerHTML = cells.map(([k, v]) => {
+    const paused = k === "ENTRIES" && v === "PAUSED";
+    return `<div class="stat"><div class="k">${k}</div><div class="v${paused ? " paused" : ""}">${v}</div></div>`;
+  }).join("");
 }
 
 function money(n: number): string {
@@ -344,15 +351,21 @@ function renderDummy(): void {
     note.textContent = dummyEnabled
       ? fillMode === "mid"
         ? "Simulated mid fills for comparison only. Not broker honest. Default proof path is buy at ask and sell at bid."
-        : "Simulated tickets. Buy at ask, sell at bid. Exit on the opposing side. Not a live broker. Each scalp stays open until the stop or the take profit."
-      : "Dummy MT5 is off. Attach the real EAs to see broker fills.";
+        : entriesPaused
+          ? "Simulated tickets. Buy at ask, sell at bid. New dummy entries are paused after a drawdown. Jev still decides. Open tickets still run to the stop or the take profit."
+          : "Simulated tickets. Buy at ask, sell at bid. Exit on the opposing side. Not a live broker. Each scalp stays open until the stop or the take profit."
+      : "Dummy MT5 is off. This tape is watch only.";
   }
   const record = $("dummyRecord");
   if (record) record.textContent = `W ${dummyPnl.wins}  L ${dummyPnl.losses}`;
   const open = $("dummyOpen");
   if (open) {
     if (!openTicket) {
-      open.textContent = dummyTape.length ? "no open ticket" : "waiting for first ticket";
+      open.textContent = entriesPaused
+        ? "entries paused. Jev still decides. no new dummy ticket."
+        : dummyTape.length
+          ? "no open ticket"
+          : "waiting for first ticket";
       open.className = "dummy-open";
     } else {
       const t = openTicket;

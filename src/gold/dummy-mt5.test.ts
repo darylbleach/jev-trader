@@ -97,6 +97,35 @@ test("book mode judges sell SL/TP on the ask", () => {
   expect(hit?.pnl).toBeCloseTo(8);
 });
 
+test("book mode does not close a buy when only the ask reaches TP", () => {
+  const acct = new DummyMt5Account(bookOpts);
+  acct.sync("buy", book(2650.0, 2650.5), 1);
+  expect(acct.openTicket?.tp).toBeCloseTo(2658.5);
+  expect(acct.checkStops(book(2658.4, 2658.5), 2)).toBeNull();
+  const hit = acct.checkStops(book(2658.5, 2659.0), 3);
+  expect(hit?.reason).toBe("tp");
+});
+
+test("book mode does not take a sell when only the bid reaches TP", () => {
+  const acct = new DummyMt5Account(bookOpts);
+  acct.sync("sell", book(2650.0, 2650.5), 1);
+  expect(acct.openTicket?.tp).toBeCloseTo(2642.0);
+  expect(acct.checkStops(book(2642.0, 2642.5), 2)).toBeNull();
+  const hit = acct.checkStops(book(2641.5, 2642.0), 3);
+  expect(hit?.reason).toBe("tp");
+});
+
+test("book flatten still closes a buy on the bid", () => {
+  const acct = new DummyMt5Account(bookOpts);
+  acct.sync("buy", book(2650.0, 2650.5), 1);
+  const fills = acct.sync("flat", book(2649.0, 2649.5), 2);
+  expect(fills).toHaveLength(1);
+  expect(fills[0]?.kind).toBe("close");
+  expect(fills[0]?.reason).toBe("signal");
+  expect(fills[0]?.price).toBeCloseTo(2649.0);
+  expect(fills[0]?.pnl).toBeCloseTo(-1.5);
+});
+
 test("same side sync is a no-op", () => {
   const acct = new DummyMt5Account(midOpts);
   acct.sync("buy", flat(2650), 1);

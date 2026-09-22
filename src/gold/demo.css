@@ -217,6 +217,10 @@ body {
   margin-top: 4px;
 }
 
+.stat .v.paused {
+  color: var(--late-ink);
+}
+
 .main {
   display: flex;
   gap: 16px;
