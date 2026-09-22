@@ -1,22 +1,25 @@
 const env = (key: string, fallback?: string) => process.env[key] ?? fallback;
 
 /**
- * XAUUSD scalp stop for bid/ask proof fills. SYMBOL_POINT 0.01 → 300 points is $3.00.
- * Live Swissquote-style book is ~$0.50 wide. Buy at ask starts ~$0.50 underwater on the bid,
- * so mark travel to a $3.00 stop is ~$2.50 (SL minus spread). Matches TP mark travel below.
+ * Locked public score: SL $3.00 / TP $2.00 (300 / 200). Already on the worker with book fills.
+ * A $0.60 target is smaller than this ~$0.50 book and is retired. $0.80 / $1.50 would need
+ * ~65% WR and unequal mark travel ($1.30 to TP vs $1.00 to SL). Keep $2 / $3 so one tape
+ * is scored: equal ~$2.50 travel after the spread, 60% cash breakeven.
  */
 export const GOLD_DEFAULT_SL_POINTS = 300;
-/**
- * Take profit: 200 points is $2.00. Clears the ~$0.50 spread with room: after buy at ask,
- * bid must travel spread + TP ≈ $2.50 to bank, equal to the SL path. Cash breakeven WR is 60%.
- */
+/** Take profit locked with the stop above. Jev prompt dollars come from these defaults. */
 export const GOLD_DEFAULT_TP_POINTS = 200;
 /**
- * Pause new dummy entries when realized P/L is at or below this USD level until POST /resume.
- * Set GOLD_PAUSE_REALIZED_USD=off (or empty with no default use) via a non-numeric value to disable.
- * Default -20 stops digging after a hole like the post-#14 book tape (~-$22 at ~53% WR).
+ * Demo-only: pause new dummy entries when realized is this many USD below the session peak.
+ * `-20` means peak minus $20 (the 22 Sep collapse started +$11 then ran ten SL).
+ * Set GOLD_PAUSE_REALIZED_USD=off to disable the peak gate. Production (GOLD_DEMO=false) never pauses.
  */
 export const GOLD_DEFAULT_PAUSE_REALIZED_USD = -20;
+/**
+ * Demo-only hard floor. Resume cannot clear it. Stops another silent ~-$40 overnight
+ * after someone resumes under the peak gate. Set GOLD_PAUSE_FLOOR_USD=off to disable.
+ */
+export const GOLD_DEFAULT_PAUSE_FLOOR_USD = -40;
 /** Short near-term window Jev is asked about. Not a swing hold. */
 export const GOLD_DEFAULT_HORIZON_MS = 6000;
 
@@ -39,12 +42,12 @@ export function parsePositiveInt(raw: string | undefined, fallback: number): num
 }
 
 /**
- * Drawdown pause floor in USD. Empty / missing → default. `off` / `false` / `none` → disabled (null).
+ * Pause gate in USD. Empty / missing → default. `off` / `false` / `none` → disabled (null).
  * Non-numeric junk falls back to default so a typo cannot silently disable the safeguard.
  */
-export function parsePauseRealizedUsd(
+export function parsePauseUsd(
   raw: string | undefined,
-  fallback: number | null = GOLD_DEFAULT_PAUSE_REALIZED_USD,
+  fallback: number | null,
 ): number | null {
   if (raw === undefined || raw === "") return fallback;
   const v = raw.trim().toLowerCase();
@@ -52,6 +55,20 @@ export function parsePauseRealizedUsd(
   const n = Number(raw);
   if (!Number.isFinite(n)) return fallback;
   return n;
+}
+
+export function parsePauseRealizedUsd(
+  raw: string | undefined,
+  fallback: number | null = GOLD_DEFAULT_PAUSE_REALIZED_USD,
+): number | null {
+  return parsePauseUsd(raw, fallback);
+}
+
+export function parsePauseFloorUsd(
+  raw: string | undefined,
+  fallback: number | null = GOLD_DEFAULT_PAUSE_FLOOR_USD,
+): number | null {
+  return parsePauseUsd(raw, fallback);
 }
 
 export const goldConfig = {
@@ -71,8 +88,10 @@ export const goldConfig = {
    * `mid` is comparison-only and must not be treated as broker-honest proof.
    */
   fillMode: parseFillMode(env("GOLD_FILL_MODE"), "book"),
-  /** When set, block new entries once realizedUsd is at or below this level until resumeEntries(). */
+  /** Peak-relative dummy pause. `-20` is $20 under the session realized high. Demo only. */
   pauseRealizedUsd: parsePauseRealizedUsd(env("GOLD_PAUSE_REALIZED_USD")),
+  /** Absolute dummy pause floor. Resume cannot clear it. Demo only. */
+  pauseFloorUsd: parsePauseFloorUsd(env("GOLD_PAUSE_FLOOR_USD")),
   reverse: env("GOLD_REVERSE", "true") !== "false",
   /**
    * Dummy reverse only after the live mid has moved at least this many points.

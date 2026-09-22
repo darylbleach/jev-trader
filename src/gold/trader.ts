@@ -1,6 +1,7 @@
 import { goldConfig } from "./config";
 import { DummyMt5Account, type BookQuote } from "./dummy-mt5";
 import type { GoldModel } from "./model-mock";
+import { realizedPeakFromTrades, shouldPauseDummyEntries, type DummyPauseReason } from "./pause";
 import { holdScalp, type PositionSide } from "./policy";
 import { type GoldProofState, PROOF_STATE_VERSION } from "./proof-state";
 import { MidRing, type GoldTick } from "./state";
@@ -49,10 +50,11 @@ export class GoldTrader {
   };
   private lastError: string | null = null;
   private dummy: DummyMt5Account | null;
-  /** Sticky: once realized hits the pause floor, block new entries until resumeEntries(). */
+  /** Derived each tick from peak drawdown and the hard floor. Demo only. */
   private entriesPaused = false;
-  /** After a manual resume below the floor, stay disarmed until realized recovers above it. */
-  private pauseArmed = true;
+  private pauseReason: DummyPauseReason | null = null;
+  /** Highest realized P/L this session. Resume can rebase it unless the hard floor is hit. */
+  private realizedPeak = 0;
   startedAt: number;
 
   onEvent: (e: GoldEvent) => void = () => {};
@@ -108,6 +110,8 @@ export class GoldTrader {
     }
     const quote = quoteFromTick(this.lastTick);
     this.refreshPnL(quote);
+    const trades = this.dummy?.closedTrades ?? [];
+    this.realizedPeak = Math.max(realizedPeakFromTrades(trades), this.totals.realizedUsd);
     this.updateEntryPause(this.totals.realizedUsd);
   }
 
@@ -128,7 +132,10 @@ export class GoldTrader {
       slPoints: goldConfig.slPoints,
       tpPoints: goldConfig.tpPoints,
       pauseRealizedUsd: goldConfig.pauseRealizedUsd,
+      pauseFloorUsd: goldConfig.pauseFloorUsd,
       entriesPaused: this.entriesPaused,
+      pauseReason: this.pauseReason,
+      realizedPeak: this.realizedPeak,
       reverse: goldConfig.reverse,
       position: this.position,
       latest: this.lastSignal,
@@ -212,30 +219,48 @@ export class GoldTrader {
   }
 
   /**
-   * Clear the drawdown entry pause. Does not close open tickets.
-   * Re-arms only after realizedUsd climbs back above the pause floor.
+   * Rebase the peak-drawdown gate so a watched room can try again.
+   * Does not close open tickets. The hard -$40 floor cannot be cleared.
    */
-  resumeEntries(): { ok: true; entriesPaused: boolean; realizedUsd: number } {
-    this.entriesPaused = false;
-    this.pauseArmed = false;
+  resumeEntries(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason: DummyPauseReason | null } {
     const quote = quoteFromTick(this.lastTick);
     const dummy = this.refreshPnL(quote);
+    const floorGate = shouldPauseDummyEntries({
+      demo: goldConfig.demo,
+      realizedUsd: dummy.realizedUsd,
+      realizedPeak: dummy.realizedUsd,
+      pauseDrawdownUsd: null,
+      pauseFloorUsd: goldConfig.pauseFloorUsd,
+    });
+    if (floorGate.pause) {
+      this.entriesPaused = true;
+      this.pauseReason = floorGate.reason;
+      this.onProofChange();
+      return {
+        ok: true,
+        entriesPaused: true,
+        realizedUsd: dummy.realizedUsd,
+        pauseReason: this.pauseReason,
+      };
+    }
+    this.realizedPeak = dummy.realizedUsd;
+    this.entriesPaused = false;
+    this.pauseReason = null;
     this.onProofChange();
-    return { ok: true, entriesPaused: this.entriesPaused, realizedUsd: dummy.realizedUsd };
+    return { ok: true, entriesPaused: false, realizedUsd: dummy.realizedUsd, pauseReason: null };
   }
 
   private updateEntryPause(realizedUsd: number): void {
-    const floor = goldConfig.pauseRealizedUsd;
-    if (floor === null) {
-      this.entriesPaused = false;
-      this.pauseArmed = true;
-      return;
-    }
-    if (realizedUsd > floor) {
-      this.pauseArmed = true;
-      return;
-    }
-    if (this.pauseArmed) this.entriesPaused = true;
+    if (realizedUsd > this.realizedPeak) this.realizedPeak = realizedUsd;
+    const gate = shouldPauseDummyEntries({
+      demo: goldConfig.demo,
+      realizedUsd,
+      realizedPeak: this.realizedPeak,
+      pauseDrawdownUsd: goldConfig.pauseRealizedUsd,
+      pauseFloorUsd: goldConfig.pauseFloorUsd,
+    });
+    this.entriesPaused = gate.pause;
+    this.pauseReason = gate.reason;
   }
 
   async onTick(tick: GoldTick, now = Date.now()): Promise<void> {

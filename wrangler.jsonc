@@ -33,6 +33,7 @@
     "GOLD_TP_POINTS": "200",
     "GOLD_FILL_MODE": "book",
     "GOLD_PAUSE_REALIZED_USD": "-20",
+    "GOLD_PAUSE_FLOOR_USD": "-40",
     "GOLD_REVERSE": "true",
     "GOLD_MAX_SPREAD_PIPS": "80",
     "XAUUSD_SPOT_URL": "https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD",

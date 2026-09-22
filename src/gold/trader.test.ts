@@ -41,6 +41,8 @@ test("signal carries non-zero SL and TP points from gold config", async () => {
   expect(snap.horizonMs).toBe(6000);
   expect(snap.fillMode).toBe("book");
   expect(snap.pauseRealizedUsd).toBe(-20);
+  expect(snap.pauseFloorUsd).toBe(-40);
+  expect(snap.entriesPaused).toBe(false);
 });
 
 test("overlapping ticks mark late and keep the last signal", async () => {
@@ -234,21 +236,26 @@ test("dummy MT5 can be disabled", async () => {
   expect(snap.totals.fills).toBe(0);
 });
 
-test("drawdown pause blocks new entries until POST resume", async () => {
-  const loss: import("./types").DummyTrade = {
-    ticket: 1,
+function closedLoss(ticket: number, pnl: number): import("./types").DummyTrade {
+  return {
+    ticket,
     side: "buy",
     lots: 0.01,
     openPrice: 2650,
-    sl: 2648,
+    sl: 2650 + pnl,
     tp: 2652,
-    closePrice: 2648,
+    closePrice: 2650 + pnl,
     reason: "sl",
-    pnl: -20,
-    openTs: 1,
-    closeTs: 2,
+    pnl,
+    openTs: ticket,
+    closeTs: ticket + 1,
   };
-  const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+}
+
+function hydrateFlat(trader: GoldTrader, trades: import("./types").DummyTrade[]): void {
+  const realized = trades.reduce((sum, t) => sum + t.pnl, 0);
+  const losses = trades.filter((t) => t.pnl < 0).length;
+  const wins = trades.filter((t) => t.pnl > 0).length;
   trader.hydrateProof({
     version: 1,
     savedAt: 1,
@@ -257,17 +264,24 @@ test("drawdown pause blocks new entries until POST resume", async () => {
     position: "flat",
     totals: { ticks: 0, decisions: 0, lateTicks: 0, fills: 0, jevUsd: 0 },
     dummy: {
-      nextTicket: 2,
+      nextTicket: trades.length + 1,
       open: null,
-      trades: [loss],
-      realized: -20,
-      wins: 0,
-      losses: 1,
-      last: loss,
+      trades,
+      realized,
+      wins,
+      losses,
+      last: trades.at(-1) ?? null,
     },
   });
+}
+
+test("drawdown pause blocks new entries until POST resume", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+  hydrateFlat(trader, [closedLoss(1, -20)]);
   expect(trader.snapshot().realizedUsd).toBe(-20);
   expect(trader.snapshot().entriesPaused).toBe(true);
+  expect(trader.snapshot().pauseReason).toBe("drawdown");
+  expect(trader.snapshot().realizedPeak).toBe(0);
 
   await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);
   expect(trader.snapshot().openTicket).toBeNull();
@@ -278,8 +292,46 @@ test("drawdown pause blocks new entries until POST resume", async () => {
   expect(resumed.ok).toBe(true);
   expect(resumed.entriesPaused).toBe(false);
   expect(trader.snapshot().entriesPaused).toBe(false);
+  expect(trader.snapshot().realizedPeak).toBe(-20);
 
   await trader.onTick({ bid: 2650, ask: 2650.5 }, 2_000);
   expect(trader.snapshot().openTicket?.side).toBe("buy");
   expect(trader.snapshot().entriesPaused).toBe(false);
+});
+
+test("peak drawdown pauses $20 under a green start", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+  hydrateFlat(trader, [closedLoss(1, 11), closedLoss(2, -20)]);
+  expect(trader.snapshot().realizedUsd).toBe(-9);
+  expect(trader.snapshot().realizedPeak).toBe(11);
+  expect(trader.snapshot().entriesPaused).toBe(true);
+  expect(trader.snapshot().pauseReason).toBe("drawdown");
+  await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);
+  expect(trader.snapshot().openTicket).toBeNull();
+});
+
+test("hard floor stays paused after resume so overnight cannot print another -$40", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+  hydrateFlat(trader, [closedLoss(1, 11), closedLoss(2, -54)]);
+  expect(trader.snapshot().realizedUsd).toBe(-43);
+  expect(trader.snapshot().entriesPaused).toBe(true);
+  expect(trader.snapshot().pauseReason).toBe("floor");
+  const resumed = trader.resumeEntries();
+  expect(resumed.entriesPaused).toBe(true);
+  expect(resumed.pauseReason).toBe("floor");
+  expect(trader.snapshot().entriesPaused).toBe(true);
+  await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);
+  expect(trader.snapshot().openTicket).toBeNull();
+});
+
+test("after a watched resume another $20 hole re-pauses at the hard floor", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+  hydrateFlat(trader, [closedLoss(1, -20)]);
+  expect(trader.resumeEntries().entriesPaused).toBe(false);
+  hydrateFlat(trader, [closedLoss(1, -20), closedLoss(2, -20)]);
+  expect(trader.snapshot().realizedUsd).toBe(-40);
+  expect(trader.snapshot().entriesPaused).toBe(true);
+  expect(trader.snapshot().pauseReason).toBe("floor");
+  await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);
+  expect(trader.snapshot().openTicket).toBeNull();
 });

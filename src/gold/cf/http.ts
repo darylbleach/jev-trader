@@ -17,7 +17,7 @@ export interface GoldHttpTrader {
   onTick(tick: { bid: number; ask: number; volume?: number; ts?: number }): Promise<void>;
   reportFill(fill: GoldFill): GoldFill;
   exportProof?(now?: number): unknown;
-  resumeEntries?(): { ok: true; entriesPaused: boolean; realizedUsd: number };
+  resumeEntries?(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason?: "drawdown" | "floor" | null };
 }
 
 export const CORS = {

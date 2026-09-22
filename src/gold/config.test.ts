@@ -1,11 +1,13 @@
 import { expect, test } from "bun:test";
 import {
   GOLD_DEFAULT_HORIZON_MS,
+  GOLD_DEFAULT_PAUSE_FLOOR_USD,
   GOLD_DEFAULT_PAUSE_REALIZED_USD,
   GOLD_DEFAULT_SL_POINTS,
   GOLD_DEFAULT_TP_POINTS,
   goldConfig,
   parseFillMode,
+  parsePauseFloorUsd,
   parsePauseRealizedUsd,
   parsePositiveInt,
 } from "./config";
@@ -75,4 +77,14 @@ test("parsePauseRealizedUsd defaults to -20 and can be turned off", () => {
   expect(parsePauseRealizedUsd("none")).toBeNull();
   expect(parsePauseRealizedUsd("junk")).toBe(-20);
   expect(goldConfig.pauseRealizedUsd).toBe(-20);
+});
+
+test("parsePauseFloorUsd defaults to -40 and can be turned off", () => {
+  expect(GOLD_DEFAULT_PAUSE_FLOOR_USD).toBe(-40);
+  expect(parsePauseFloorUsd(undefined)).toBe(-40);
+  expect(parsePauseFloorUsd("")).toBe(-40);
+  expect(parsePauseFloorUsd("-50")).toBe(-50);
+  expect(parsePauseFloorUsd("off")).toBeNull();
+  expect(parsePauseFloorUsd("junk")).toBe(-40);
+  expect(goldConfig.pauseFloorUsd).toBe(-40);
 });

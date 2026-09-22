@@ -8,6 +8,7 @@ test("GOLD_ENV_KEYS includes GOLD_MODEL and TYPESAFE_AI_API_KEY", () => {
   expect(GOLD_ENV_KEYS).toContain("GOLD_MIN_REVERSE_POINTS");
   expect(GOLD_ENV_KEYS).toContain("GOLD_FILL_MODE");
   expect(GOLD_ENV_KEYS).toContain("GOLD_PAUSE_REALIZED_USD");
+  expect(GOLD_ENV_KEYS).toContain("GOLD_PAUSE_FLOOR_USD");
 });
 
 test("applyWorkerEnv copies GOLD_MODEL and TYPESAFE_AI_API_KEY onto process.env", () => {
