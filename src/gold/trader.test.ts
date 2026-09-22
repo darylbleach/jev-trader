@@ -36,9 +36,10 @@ test("signal carries non-zero SL and TP points from gold config", async () => {
   const snap = trader.snapshot();
   expect(s?.slPoints).toBe(snap.slPoints);
   expect(s?.tpPoints).toBe(snap.tpPoints);
-  expect(snap.slPoints).toBe(100);
-  expect(snap.tpPoints).toBe(60);
+  expect(snap.slPoints).toBe(200);
+  expect(snap.tpPoints).toBe(100);
   expect(snap.horizonMs).toBe(6000);
+  expect(snap.fillMode).toBe("book");
 });
 
 test("overlapping ticks mark late and keep the last signal", async () => {
@@ -63,15 +64,18 @@ test("a later tick after the interval decides again", async () => {
   expect(trader.snapshot().position).toBe("sell");
 });
 
-function dummyAccount(): DummyMt5Account {
-  return new DummyMt5Account({
-    lot: 0.01,
-    slPoints: 600,
-    tpPoints: 800,
-    point: 0.01,
-    contractSize: 100,
-    historySize: 20,
-  });
+const dummyOpts = {
+  lot: 0.01,
+  slPoints: 600,
+  tpPoints: 800,
+  point: 0.01,
+  contractSize: 100,
+  historySize: 20,
+  fillMode: "mid" as const,
+};
+
+function dummyAccount() {
+  return new DummyMt5Account(dummyOpts);
 }
 
 test("dry-run snapshot exposes realized, open, total, and last ticket pnl", async () => {
@@ -111,15 +115,6 @@ test("a late tick still marks dummy open pnl", async () => {
   expect(trader.history.at(-1)?.pnl?.unrealizedUsd).toBeCloseTo(1);
 });
 
-const dummyOpts = {
-  lot: 0.01,
-  slPoints: 600,
-  tpPoints: 800,
-  point: 0.01,
-  contractSize: 100,
-  historySize: 20,
-};
-
 test("dummy MT5 opens a buy ticket on the first signal", async () => {
   const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account(dummyOpts));
   const fills: string[] = [];
@@ -133,6 +128,18 @@ test("dummy MT5 opens a buy ticket on the first signal", async () => {
   expect(snap.openTicket?.tp).toBeCloseTo(2658.1);
   expect(fills).toEqual(["open:buy"]);
   expect(snap.totals.fills).toBe(1);
+});
+
+test("default book fill mode buys at ask on the live trader", async () => {
+  const trader = new GoldTrader(
+    new FixedModel("buy"),
+    new DummyMt5Account({ ...dummyOpts, fillMode: "book" }),
+  );
+  await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);
+  const snap = trader.snapshot();
+  expect(snap.fillMode).toBe("book");
+  expect(snap.openTicket?.openPrice).toBeCloseTo(2650.5);
+  expect(snap.unrealizedUsd).toBeCloseTo(-0.5);
 });
 
 test("dummy MT5 holds a reverse while the live mid is unchanged", async () => {

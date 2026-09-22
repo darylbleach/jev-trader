@@ -1,5 +1,5 @@
 import { goldConfig } from "./config";
-import { DummyMt5Account } from "./dummy-mt5";
+import { DummyMt5Account, type BookQuote } from "./dummy-mt5";
 import type { GoldModel } from "./model-mock";
 import { holdScalp, type PositionSide } from "./policy";
 import { type GoldProofState, PROOF_STATE_VERSION } from "./proof-state";
@@ -17,7 +17,13 @@ function createDummyAccount(): DummyMt5Account | null {
     contractSize: goldConfig.contractSize,
     historySize: goldConfig.historySize,
     minReversePoints: goldConfig.minReversePoints,
+    fillMode: goldConfig.fillMode,
   });
+}
+
+function quoteFromTick(tick: GoldTick | null, fallbackPrice = 0): BookQuote {
+  if (!tick) return { bid: fallbackPrice, ask: fallbackPrice };
+  return { bid: tick.bid, ask: tick.ask };
 }
 
 export class GoldTrader {
@@ -96,19 +102,20 @@ export class GoldTrader {
         this.position = this.dummy.openTicket?.side ?? "flat";
       }
     }
-    const mid = this.lastTick ? (this.lastTick.bid + this.lastTick.ask) / 2 : 0;
-    this.refreshPnL(mid);
+    const quote = quoteFromTick(this.lastTick);
+    this.refreshPnL(quote);
   }
 
   snapshot() {
-    const mid = this.lastTick ? (this.lastTick.bid + this.lastTick.ask) / 2 : 0;
-    const dummy = this.refreshPnL(mid);
+    const quote = quoteFromTick(this.lastTick);
+    const dummy = this.refreshPnL(quote);
     return {
       model: this.model.name,
       market: "XAUUSD" as const,
       dryRun: goldConfig.dryRun,
       dummyMt5: this.dummy !== null,
       simulated: this.dummy !== null,
+      fillMode: this.dummy?.mode ?? goldConfig.fillMode,
       startedAt: this.startedAt,
       intervalMs: goldConfig.intervalMs,
       horizonMs: goldConfig.horizonMs,
@@ -142,7 +149,7 @@ export class GoldTrader {
     };
   }
 
-  private dummySnapshot(mid: number): {
+  private dummySnapshot(quote: BookQuote): {
     openTicket: DummyTicket | null;
     trades: DummyTrade[];
     lastTicket: DummyTrade | null;
@@ -168,11 +175,11 @@ export class GoldTrader {
         losses: 0,
       };
     }
-    return this.dummy.snapshot(mid);
+    return this.dummy.snapshot(quote);
   }
 
-  private refreshPnL(mid: number) {
-    const dummy = this.dummySnapshot(mid);
+  private refreshPnL(quote: BookQuote) {
+    const dummy = this.dummySnapshot(quote);
     this.totals.realizedUsd = dummy.realizedUsd;
     this.totals.unrealizedUsd = dummy.unrealizedUsd;
     this.totals.pnlUsd = dummy.pnlUsd;
@@ -181,8 +188,8 @@ export class GoldTrader {
     return dummy;
   }
 
-  private decorate(event: GoldEvent, mid: number): GoldEvent {
-    const dummy = this.refreshPnL(mid);
+  private decorate(event: GoldEvent, quote: BookQuote): GoldEvent {
+    const dummy = this.refreshPnL(quote);
     const pnl: DummyPnL = {
       realizedUsd: dummy.realizedUsd,
       unrealizedUsd: dummy.unrealizedUsd,
@@ -200,9 +207,10 @@ export class GoldTrader {
   async onTick(tick: GoldTick, now = Date.now()): Promise<void> {
     this.totals.ticks++;
     this.lastTick = tick;
+    const quote: BookQuote = { bid: tick.bid, ask: tick.ask };
     const mid = (tick.bid + tick.ask) / 2;
     this.ring.push(mid);
-    this.applyDummyStops(mid, now);
+    this.applyDummyStops(quote, now);
     if (this.dummy) this.position = this.dummy.openTicket?.side ?? "flat";
 
     const gate = this.throttle.tryStart(now);
@@ -218,7 +226,7 @@ export class GoldTrader {
         fill: null,
         late: true,
         lateReason: gate.reason,
-      }, mid);
+      }, quote);
       this.onEvent(this.pushHistory(event));
       return;
     }
@@ -247,7 +255,7 @@ export class GoldTrader {
           fill: null,
           late: true,
           lateReason: "busy",
-        }, state.mid);
+        }, { bid: state.bid, ask: state.ask });
         this.onEvent(this.pushHistory(event));
         return;
       }
@@ -258,7 +266,7 @@ export class GoldTrader {
       if (action === "buy" || action === "sell") {
         this.position = holdScalp(this.position, action);
       }
-      this.syncDummy(this.position, mid, now);
+      this.syncDummy(this.position, quote, now);
       if (this.dummy) {
         this.position = this.dummy.openTicket?.side ?? "flat";
       }
@@ -292,7 +300,7 @@ export class GoldTrader {
         decision: signal,
         fill: null,
         late: false,
-      }, state.mid);
+      }, { bid: state.bid, ask: state.ask });
       this.onEvent(this.pushHistory(event));
       this.onSignal(signal);
     } finally {
@@ -306,17 +314,18 @@ export class GoldTrader {
     if (this.fills.length > goldConfig.historySize) this.fills.shift();
     this.totals.fills++;
     const tick = this.lastTick;
-    const mid = tick ? (tick.bid + tick.ask) / 2 : recorded.price;
+    const quote = quoteFromTick(tick, recorded.price);
+    const mid = (quote.bid + quote.ask) / 2;
     const event = this.decorate({
       ts: recorded.ts ?? Date.now(),
       mid,
-      bid: tick?.bid ?? recorded.price,
-      ask: tick?.ask ?? recorded.price,
+      bid: quote.bid,
+      ask: quote.ask,
       spreadPips: this.lastSignal?.spreadPips ?? 0,
       decision: this.lastSignal,
       fill: recorded,
       late: false,
-    }, mid);
+    }, quote);
     this.onEvent(this.pushHistory(event));
     this.onFill(recorded);
     this.onProofChange();
@@ -327,19 +336,19 @@ export class GoldTrader {
     return recorded;
   }
 
-  private applyDummyStops(mid: number, now: number): void {
+  private applyDummyStops(quote: BookQuote, now: number): void {
     if (!this.dummy) return;
-    const fill = this.dummy.checkStops(mid, now);
+    const fill = this.dummy.checkStops(quote, now);
     if (fill) this.reportFill(fill);
   }
 
-  private syncDummy(want: PositionSide, mid: number, now: number): void {
+  private syncDummy(want: PositionSide, quote: BookQuote, now: number): void {
     if (!this.dummy) return;
-    for (const fill of this.dummy.sync(want, mid, now)) this.reportFill(fill);
+    for (const fill of this.dummy.sync(want, quote, now)) this.reportFill(fill);
   }
 
   private pushHistory(event: GoldEvent): GoldEvent {
-    const decorated = this.decorate(event, event.mid);
+    const decorated = this.decorate(event, { bid: event.bid, ask: event.ask });
     this.history.push(decorated);
     if (this.history.length > goldConfig.historySize) this.history.shift();
     return decorated;

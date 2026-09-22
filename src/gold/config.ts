@@ -1,15 +1,28 @@
 const env = (key: string, fallback?: string) => process.env[key] ?? fallback;
 
 /**
- * XAUUSD scalp stop. Many brokers quote SYMBOL_POINT 0.01, so 100 points is $1.00.
- * A live spot bounce of about $0.80 tagged a $0.40 stop and knocked out the side
- * that was about to pay. Leave room for that bounce. Still not a multi dollar hold.
+ * XAUUSD scalp stop for bid/ask proof fills. SYMBOL_POINT 0.01 → 200 points is $2.00.
+ * Live Swissquote-style book is ~$0.50 wide. Buy at ask starts ~$0.50 underwater on the bid,
+ * so mark travel to a $2.00 stop is ~$1.50 (SL minus spread). Matches TP mark travel below.
  */
-export const GOLD_DEFAULT_SL_POINTS = 100;
-/** Quick take profit, closer than the stop: 60 points is $0.60. Bank the small win. */
-export const GOLD_DEFAULT_TP_POINTS = 60;
+export const GOLD_DEFAULT_SL_POINTS = 200;
+/**
+ * Take profit: 100 points is $1.00. Clears the ~$0.50 spread with room: after buy at ask,
+ * bid must travel spread + TP ≈ $1.50 to bank, equal to the SL path. Not a multi dollar hold.
+ */
+export const GOLD_DEFAULT_TP_POINTS = 100;
 /** Short near-term window Jev is asked about. Not a swing hold. */
 export const GOLD_DEFAULT_HORIZON_MS = 6000;
+
+/** Default proof path pays the book. Set GOLD_FILL_MODE=mid only for mid-fill comparison. */
+export type GoldFillMode = "book" | "mid";
+
+export function parseFillMode(raw: string | undefined, fallback: GoldFillMode = "book"): GoldFillMode {
+  if (raw === undefined || raw === "") return fallback;
+  const v = raw.trim().toLowerCase();
+  if (v === "mid" || v === "book") return v;
+  return fallback;
+}
 
 /** Env integers used for SL/TP. Zero, negative, or non-numeric values fall back so exits stay on. */
 export function parsePositiveInt(raw: string | undefined, fallback: number): number {
@@ -31,6 +44,11 @@ export const goldConfig = {
   point: Number(env("GOLD_POINT", "0.01")),
   slPoints: parsePositiveInt(env("GOLD_SL_POINTS"), GOLD_DEFAULT_SL_POINTS),
   tpPoints: parsePositiveInt(env("GOLD_TP_POINTS"), GOLD_DEFAULT_TP_POINTS),
+  /**
+   * Dummy / demo fill model. `book` (default): buy ask / sell bid, exit on the opposing side.
+   * `mid` is comparison-only and must not be treated as broker-honest proof.
+   */
+  fillMode: parseFillMode(env("GOLD_FILL_MODE"), "book"),
   reverse: env("GOLD_REVERSE", "true") !== "false",
   /**
    * Dummy reverse only after the live mid has moved at least this many points.
