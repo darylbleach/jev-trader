@@ -1,14 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
+import { keepGoldAlarm } from "./alarm";
 import { applyWorkerEnv } from "./env";
 import { createSseHub, handleGoldHttp, type GoldHttpTrader, type GoldMeta, type SseHub } from "./http";
-
-const IDLE_MS = 15 * 60_000;
 
 /**
  * One shared XAUUSD demo room so every viewer sees the same tape.
  * Boots the same GoldTrader / DummyMt5 / createGoldModel path as `bun run gold`.
  * A Durable Object alarm calls stepLiveGoldQuote every GOLD_INTERVAL_MS (1s).
- * Cron cannot do that: Workers cron is once a minute at best.
+ * While GOLD_DEMO is on, that alarm stays armed after the browser closes.
+ * Workers cron is once a minute at best, so it only re-arms a lost alarm.
  * GOLD_MODEL=jev boots GoldJevModel via createGoldModel after applyWorkerEnv.
  */
 export class GoldRoom extends DurableObject<Env> {
@@ -22,6 +22,7 @@ export class GoldRoom extends DurableObject<Env> {
   private lastFetch = 0;
   private intervalMs = 1000;
   private refreshMs = 1000;
+  private demo = true;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -30,6 +31,17 @@ export class GoldRoom extends DurableObject<Env> {
 
   async ensureTicking(): Promise<void> {
     await this.boot();
+    await this.arm();
+  }
+
+  /** Cron entry. A production room does not start its own quote clock. */
+  async wake(): Promise<void> {
+    await this.boot();
+    if (!this.demo) return;
+    await this.arm();
+  }
+
+  private async arm(): Promise<void> {
     await this.ctx.storage.put("lastSeen", Date.now());
     const alarm = await this.ctx.storage.getAlarm();
     if (alarm == null) {
@@ -51,16 +63,16 @@ export class GoldRoom extends DurableObject<Env> {
       console.error("gold alarm", err instanceof Error ? err.message : String(err));
     }
     const lastSeen = (await this.ctx.storage.get<number>("lastSeen")) ?? 0;
-    const idle = this.hub.size === 0 && Date.now() - lastSeen > IDLE_MS;
-    if (!idle) {
+    if (keepGoldAlarm({ demo: this.demo, viewers: this.hub.size, lastSeen, now: Date.now() })) {
       await this.ctx.storage.setAlarm(Date.now() + this.intervalMs);
     }
   }
 
   private async boot(): Promise<GoldHttpTrader> {
     applyWorkerEnv(this.env);
-    if (this.trader && this.meta) return this.trader;
     const { goldConfig } = await import("../config");
+    this.demo = goldConfig.demo;
+    if (this.trader && this.meta) return this.trader;
     const { GoldTrader } = await import("../trader");
     const { createGoldModel } = await import("../model");
     const model = createGoldModel();

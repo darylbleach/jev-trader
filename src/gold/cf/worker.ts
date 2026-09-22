@@ -39,4 +39,10 @@ export default {
 
     return stub.fetch(request);
   },
+
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (String(env.GOLD_DEMO) === "false") return;
+    const stub = env.GOLD_ROOM.getByName("xauusd-jev");
+    ctx.waitUntil(stub.wake());
+  },
 } satisfies ExportedHandler<Env>;
