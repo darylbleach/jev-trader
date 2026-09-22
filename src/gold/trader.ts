@@ -2,6 +2,7 @@ import { goldConfig } from "./config";
 import { DummyMt5Account } from "./dummy-mt5";
 import type { GoldModel } from "./model-mock";
 import { holdScalp, type PositionSide } from "./policy";
+import { type GoldProofState, PROOF_STATE_VERSION } from "./proof-state";
 import { MidRing, type GoldTick } from "./state";
 import { DecisionThrottle } from "./throttle";
 import type { DummyPnL, DummyTicket, DummyTrade, GoldEvent, GoldFill, GoldSignal, GoldTotals } from "./types";
@@ -42,13 +43,61 @@ export class GoldTrader {
   };
   private lastError: string | null = null;
   private dummy: DummyMt5Account | null;
+  startedAt: number;
 
   onEvent: (e: GoldEvent) => void = () => {};
   onSignal: (s: GoldSignal) => void = () => {};
   onFill: (f: GoldFill) => void = () => {};
+  /** Fired after closes/opens so Durable Object storage can flush proof history. */
+  onProofChange: () => void = () => {};
 
   constructor(private model: GoldModel, dummy?: DummyMt5Account | null) {
     this.dummy = dummy === undefined ? createDummyAccount() : dummy;
+    this.startedAt = Date.now();
+  }
+
+  /** Closed trades + session counters for Durable Object / export backup. */
+  exportProof(now = Date.now()): GoldProofState {
+    return {
+      version: PROOF_STATE_VERSION,
+      savedAt: now,
+      startedAt: this.startedAt,
+      seq: this.seq,
+      position: this.position,
+      totals: {
+        ticks: this.totals.ticks,
+        decisions: this.totals.decisions,
+        lateTicks: this.totals.lateTicks,
+        fills: this.totals.fills,
+        jevUsd: this.totals.jevUsd,
+      },
+      dummy: this.dummy ? this.dummy.exportState() : null,
+    };
+  }
+
+  /** Restore proof history after a deploy, hibernation, or local restart. */
+  hydrateProof(state: GoldProofState): void {
+    this.startedAt = state.startedAt;
+    this.seq = state.seq;
+    this.position = state.position;
+    this.totals.ticks = state.totals.ticks;
+    this.totals.decisions = state.totals.decisions;
+    this.totals.lateTicks = state.totals.lateTicks;
+    this.totals.fills = state.totals.fills;
+    this.totals.jevUsd = state.totals.jevUsd;
+    if (state.dummy && this.dummy) {
+      this.dummy.hydrate(state.dummy);
+      this.position = this.dummy.openTicket?.side ?? "flat";
+    } else if (state.dummy && !this.dummy) {
+      // Dummy was on when saved; recreate so restores still show the tape.
+      this.dummy = createDummyAccount();
+      if (this.dummy) {
+        this.dummy.hydrate(state.dummy);
+        this.position = this.dummy.openTicket?.side ?? "flat";
+      }
+    }
+    const mid = this.lastTick ? (this.lastTick.bid + this.lastTick.ask) / 2 : 0;
+    this.refreshPnL(mid);
   }
 
   snapshot() {
@@ -143,8 +192,6 @@ export class GoldTrader {
     };
     return { ...event, pnl, lastTicket: dummy.lastTicket };
   }
-
-  readonly startedAt = Date.now();
 
   signal(): GoldSignal | null {
     return this.lastSignal;
@@ -272,6 +319,7 @@ export class GoldTrader {
     }, mid);
     this.onEvent(this.pushHistory(event));
     this.onFill(recorded);
+    this.onProofChange();
     if (!this.dummy && (recorded.reason === "sl" || recorded.reason === "tp")) {
       this.position = "flat";
       if (this.lastSignal) this.lastSignal = { ...this.lastSignal, position: "flat" };

@@ -16,6 +16,7 @@ export interface GoldHttpTrader {
   signal(): GoldSignal | null;
   onTick(tick: { bid: number; ask: number; volume?: number; ts?: number }): Promise<void>;
   reportFill(fill: GoldFill): GoldFill;
+  exportProof?(now?: number): unknown;
 }
 
 export const CORS = {
@@ -126,6 +127,10 @@ export async function handleGoldHttp(
     return json({ ...trader.snapshot(), ...meta });
   }
   if (pathname === "/history" && request.method === "GET") return json(trader.history);
+  if (pathname === "/export" && request.method === "GET") {
+    if (typeof trader.exportProof !== "function") return json({ error: "export unavailable" }, 501);
+    return json(trader.exportProof(Date.now()));
+  }
   if (pathname === "/signal" && request.method === "GET") {
     const latest = trader.signal();
     return latest ? json(latest) : json({ error: "no signal yet" }, 404);
