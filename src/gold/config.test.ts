@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   GOLD_DEFAULT_HORIZON_MS,
+  GOLD_DEFAULT_MIN_REVERSE_POINTS,
   GOLD_DEFAULT_PAUSE_FLOOR_USD,
   GOLD_DEFAULT_PAUSE_REALIZED_USD,
   GOLD_DEFAULT_SL_POINTS,
@@ -12,25 +13,25 @@ import {
   parsePositiveInt,
 } from "./config";
 
-test("gold SL and TP defaults clear a half dollar book with room", () => {
-  expect(GOLD_DEFAULT_SL_POINTS).toBe(300);
-  expect(GOLD_DEFAULT_TP_POINTS).toBe(200);
-  expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBeCloseTo(3);
-  expect(GOLD_DEFAULT_TP_POINTS * 0.01).toBeCloseTo(2);
-  expect(GOLD_DEFAULT_SL_POINTS).toBeGreaterThan(GOLD_DEFAULT_TP_POINTS);
+test("gold SL and TP defaults flip cash R:R for ~40% breakeven WR", () => {
+  expect(GOLD_DEFAULT_SL_POINTS).toBe(200);
+  expect(GOLD_DEFAULT_TP_POINTS).toBe(300);
+  expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBeCloseTo(2);
+  expect(GOLD_DEFAULT_TP_POINTS * 0.01).toBeCloseTo(3);
+  expect(GOLD_DEFAULT_TP_POINTS).toBeGreaterThan(GOLD_DEFAULT_SL_POINTS);
   expect(GOLD_DEFAULT_SL_POINTS).toBeGreaterThan(15);
   expect(GOLD_DEFAULT_SL_POINTS).toBeLessThanOrEqual(400);
-  expect(GOLD_DEFAULT_TP_POINTS).toBeLessThanOrEqual(300);
+  expect(GOLD_DEFAULT_TP_POINTS).toBeLessThanOrEqual(400);
   expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBeGreaterThan(0.5);
   expect(GOLD_DEFAULT_TP_POINTS * 0.01).toBeGreaterThan(0.5);
-  // Equal mark travel on a $0.50 book: spread+TP == SL-spread
-  expect(0.5 + GOLD_DEFAULT_TP_POINTS * 0.01).toBeCloseTo(GOLD_DEFAULT_SL_POINTS * 0.01 - 0.5);
-  // Cash breakeven WR = SL/(TP+SL) ≈ 60%
-  expect(GOLD_DEFAULT_SL_POINTS / (GOLD_DEFAULT_TP_POINTS + GOLD_DEFAULT_SL_POINTS)).toBeCloseTo(0.6);
+  // Cash breakeven WR = SL/(TP+SL) ≈ 40%
+  expect(GOLD_DEFAULT_SL_POINTS / (GOLD_DEFAULT_TP_POINTS + GOLD_DEFAULT_SL_POINTS)).toBeCloseTo(0.4);
+  // At 50% WR: E = 0.5*3 + 0.5*(-2) = +0.5 per trade
+  expect(0.5 * 3 + 0.5 * -2).toBeCloseTo(0.5);
 });
 
 test("gold horizon is a short scalp window and decisions stay frequent", () => {
-  expect(GOLD_DEFAULT_HORIZON_MS).toBe(6000);
+  expect(GOLD_DEFAULT_HORIZON_MS).toBe(10000);
   expect(goldConfig.horizonMs).toBe(GOLD_DEFAULT_HORIZON_MS);
   expect(goldConfig.intervalMs).toBeLessThanOrEqual(1000);
   expect(goldConfig.reverse).toBe(true);
@@ -46,7 +47,8 @@ test("dummy MT5 is on by default in dry-run", () => {
   expect(goldConfig.dryRun).toBe(true);
   expect(goldConfig.dummyMt5).toBe(true);
   expect(goldConfig.contractSize).toBe(100);
-  expect(goldConfig.minReversePoints).toBe(1);
+  expect(goldConfig.minReversePoints).toBe(GOLD_DEFAULT_MIN_REVERSE_POINTS);
+  expect(GOLD_DEFAULT_MIN_REVERSE_POINTS).toBe(50);
   expect(goldConfig.spotRefreshMs).toBe(1000);
 });
 
@@ -79,12 +81,12 @@ test("parsePauseRealizedUsd defaults to -20 and can be turned off", () => {
   expect(goldConfig.pauseRealizedUsd).toBe(-20);
 });
 
-test("parsePauseFloorUsd defaults to -40 and can be turned off", () => {
-  expect(GOLD_DEFAULT_PAUSE_FLOOR_USD).toBe(-40);
-  expect(parsePauseFloorUsd(undefined)).toBe(-40);
-  expect(parsePauseFloorUsd("")).toBe(-40);
+test("parsePauseFloorUsd defaults to -80 and can be turned off", () => {
+  expect(GOLD_DEFAULT_PAUSE_FLOOR_USD).toBe(-80);
+  expect(parsePauseFloorUsd(undefined)).toBe(-80);
+  expect(parsePauseFloorUsd("")).toBe(-80);
   expect(parsePauseFloorUsd("-50")).toBe(-50);
   expect(parsePauseFloorUsd("off")).toBeNull();
-  expect(parsePauseFloorUsd("junk")).toBe(-40);
-  expect(goldConfig.pauseFloorUsd).toBe(-40);
+  expect(parsePauseFloorUsd("junk")).toBe(-80);
+  expect(goldConfig.pauseFloorUsd).toBe(-80);
 });

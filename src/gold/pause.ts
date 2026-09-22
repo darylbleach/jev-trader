@@ -19,7 +19,7 @@ export interface DummyPauseInput {
    */
   pauseDrawdownUsd: number | null;
   /**
-   * Absolute realized floor. `-40` means pause at or below -$40 even after resume.
+   * Absolute realized floor. `-80` means pause at or below -$80 even after resume.
    * `null` disables the hard floor.
    */
   pauseFloorUsd: number | null;
@@ -45,7 +45,7 @@ export function realizedPeakFromTrades(trades: readonly Pick<DummyTrade, "pnl">[
  *
  * Two gates, either one is enough:
  * - peak drawdown: realized <= peak + pauseDrawdownUsd (default peak -$20)
- * - hard floor: realized <= pauseFloorUsd (default -$40)
+ * - hard floor: realized <= pauseFloorUsd (default -$80)
  */
 export function shouldPauseDummyEntries(input: DummyPauseInput): DummyPauseGate {
   if (!input.demo) return { pause: false, reason: null };

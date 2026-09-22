@@ -27,18 +27,18 @@
     "GOLD_DRY_RUN": "true",
     "GOLD_DUMMY_MT5": "true",
     "GOLD_INTERVAL_MS": "1000",
-    "GOLD_HORIZON_MS": "6000",
+    "GOLD_HORIZON_MS": "10000",
     "GOLD_LOT": "0.01",
-    "GOLD_SL_POINTS": "300",
-    "GOLD_TP_POINTS": "200",
+    "GOLD_SL_POINTS": "200",
+    "GOLD_TP_POINTS": "300",
     "GOLD_FILL_MODE": "book",
     "GOLD_PAUSE_REALIZED_USD": "-20",
-    "GOLD_PAUSE_FLOOR_USD": "-40",
+    "GOLD_PAUSE_FLOOR_USD": "-80",
     "GOLD_REVERSE": "true",
     "GOLD_MAX_SPREAD_PIPS": "80",
     "XAUUSD_SPOT_URL": "https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD",
     "XAUUSD_SPOT_REFRESH_MS": "1000",
-    "GOLD_MIN_REVERSE_POINTS": "1"
+    "GOLD_MIN_REVERSE_POINTS": "50"
   },
   "durable_objects": {
     "bindings": [

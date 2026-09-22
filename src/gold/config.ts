@@ -1,14 +1,14 @@
 const env = (key: string, fallback?: string) => process.env[key] ?? fallback;
 
 /**
- * Locked public score: SL $3.00 / TP $2.00 (300 / 200). Already on the worker with book fills.
- * A $0.60 target is smaller than this ~$0.50 book and is retired. $0.80 / $1.50 would need
- * ~65% WR and unequal mark travel ($1.30 to TP vs $1.00 to SL). Keep $2 / $3 so one tape
- * is scored: equal ~$2.50 travel after the spread, 60% cash breakeven.
+ * Locked public score: TP $3.00 / SL $2.00 (300 / 200). Book fills only.
+ * Prior $2 TP / $3 SL needed ~60% WR; live book sat near 50% and bled (~-$41).
+ * Flipped cash R:R so breakeven WR = SL/(TP+SL) ≈ 40%. At ~50% WR expectancy is positive
+ * even though mark travel to TP is longer than to SL on a ~$0.50 book.
  */
-export const GOLD_DEFAULT_SL_POINTS = 300;
-/** Take profit locked with the stop above. Jev prompt dollars come from these defaults. */
-export const GOLD_DEFAULT_TP_POINTS = 200;
+export const GOLD_DEFAULT_SL_POINTS = 200;
+/** Take profit larger than the stop so a coin-flip book WR can still print green cash. */
+export const GOLD_DEFAULT_TP_POINTS = 300;
 /**
  * Demo-only: pause new dummy entries when realized is this many USD below the session peak.
  * `-20` means peak minus $20 (the 22 Sep collapse started +$11 then ran ten SL).
@@ -16,12 +16,18 @@ export const GOLD_DEFAULT_TP_POINTS = 200;
  */
 export const GOLD_DEFAULT_PAUSE_REALIZED_USD = -20;
 /**
- * Demo-only hard floor. Resume cannot clear it. Stops another silent ~-$40 overnight
- * after someone resumes under the peak gate. Set GOLD_PAUSE_FLOOR_USD=off to disable.
+ * Demo-only hard floor. Resume cannot clear it. Deepened to -$80 so a watched resume can
+ * score the flipped payoff after the old $2/$3 hole (~-$41), while still capping another
+ * silent overnight bleed. Set GOLD_PAUSE_FLOOR_USD=off to disable.
  */
-export const GOLD_DEFAULT_PAUSE_FLOOR_USD = -40;
-/** Short near-term window Jev is asked about. Not a swing hold. */
-export const GOLD_DEFAULT_HORIZON_MS = 6000;
+export const GOLD_DEFAULT_PAUSE_FLOOR_USD = -80;
+/**
+ * Short scalp window Jev is asked about. Slightly longer than 6s so the model aims at the
+ * $3 target instead of 14/min range scratches. Not a swing hold.
+ */
+export const GOLD_DEFAULT_HORIZON_MS = 10000;
+/** Dummy reverse only after mid moves this far. Discourages flip-spam on a flat print. */
+export const GOLD_DEFAULT_MIN_REVERSE_POINTS = 50;
 
 /** Default proof path pays the book. Set GOLD_FILL_MODE=mid only for mid-fill comparison. */
 export type GoldFillMode = "book" | "mid";
@@ -95,9 +101,9 @@ export const goldConfig = {
   reverse: env("GOLD_REVERSE", "true") !== "false",
   /**
    * Dummy reverse only after the live mid has moved at least this many points.
-   * Stops scratch $0 closes when Jev flips on an unchanged spot.
+   * Stops scratch closes when Jev flips on an almost-flat print (hold-until-exit still wins).
    */
-  minReversePoints: parsePositiveInt(env("GOLD_MIN_REVERSE_POINTS"), 1),
+  minReversePoints: parsePositiveInt(env("GOLD_MIN_REVERSE_POINTS"), GOLD_DEFAULT_MIN_REVERSE_POINTS),
   dryRun: env("GOLD_DRY_RUN", "true") !== "false",
   /**
    * Simulated JevLeader tickets. Defaults on whenever dry-run is on (the demo).

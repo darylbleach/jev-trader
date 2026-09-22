@@ -41,23 +41,23 @@ test("peak drawdown pauses $20 under the session high", () => {
   ).toEqual({ pause: false, reason: null });
 });
 
-test("hard floor pauses at -$40 even after a resume resets the peak", () => {
+test("hard floor pauses at the configured floor even after a resume resets the peak", () => {
   expect(
     shouldPauseDummyEntries({
       demo: true,
-      realizedUsd: -40,
-      realizedPeak: -40,
+      realizedUsd: -80,
+      realizedPeak: -80,
       pauseDrawdownUsd: -20,
-      pauseFloorUsd: -40,
+      pauseFloorUsd: -80,
     }),
   ).toEqual({ pause: true, reason: "floor" });
   expect(
     shouldPauseDummyEntries({
       demo: true,
-      realizedUsd: -43,
-      realizedPeak: -43,
+      realizedUsd: -85,
+      realizedPeak: -85,
       pauseDrawdownUsd: -20,
-      pauseFloorUsd: -40,
+      pauseFloorUsd: -80,
     }),
   ).toEqual({ pause: true, reason: "floor" });
 });
@@ -66,10 +66,10 @@ test("floor wins over drawdown when both are hit", () => {
   expect(
     shouldPauseDummyEntries({
       demo: true,
-      realizedUsd: -43,
+      realizedUsd: -85,
       realizedPeak: 11,
       pauseDrawdownUsd: -20,
-      pauseFloorUsd: -40,
+      pauseFloorUsd: -80,
     }).reason,
   ).toBe("floor");
 });
@@ -81,7 +81,7 @@ test("turning a gate off leaves the other one live", () => {
       realizedUsd: -25,
       realizedPeak: 0,
       pauseDrawdownUsd: null,
-      pauseFloorUsd: -40,
+      pauseFloorUsd: -80,
     }),
   ).toEqual({ pause: false, reason: null });
   expect(

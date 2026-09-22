@@ -36,12 +36,12 @@ test("signal carries non-zero SL and TP points from gold config", async () => {
   const snap = trader.snapshot();
   expect(s?.slPoints).toBe(snap.slPoints);
   expect(s?.tpPoints).toBe(snap.tpPoints);
-  expect(snap.slPoints).toBe(300);
-  expect(snap.tpPoints).toBe(200);
-  expect(snap.horizonMs).toBe(6000);
+  expect(snap.slPoints).toBe(200);
+  expect(snap.tpPoints).toBe(300);
+  expect(snap.horizonMs).toBe(10000);
   expect(snap.fillMode).toBe("book");
   expect(snap.pauseRealizedUsd).toBe(-20);
-  expect(snap.pauseFloorUsd).toBe(-40);
+  expect(snap.pauseFloorUsd).toBe(-80);
   expect(snap.entriesPaused).toBe(false);
 });
 
@@ -310,10 +310,10 @@ test("peak drawdown pauses $20 under a green start", async () => {
   expect(trader.snapshot().openTicket).toBeNull();
 });
 
-test("hard floor stays paused after resume so overnight cannot print another -$40", async () => {
+test("hard floor stays paused after resume so overnight cannot print another deep hole", async () => {
   const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
-  hydrateFlat(trader, [closedLoss(1, 11), closedLoss(2, -54)]);
-  expect(trader.snapshot().realizedUsd).toBe(-43);
+  hydrateFlat(trader, [closedLoss(1, 11), closedLoss(2, -96)]);
+  expect(trader.snapshot().realizedUsd).toBe(-85);
   expect(trader.snapshot().entriesPaused).toBe(true);
   expect(trader.snapshot().pauseReason).toBe("floor");
   const resumed = trader.resumeEntries();
@@ -324,12 +324,12 @@ test("hard floor stays paused after resume so overnight cannot print another -$4
   expect(trader.snapshot().openTicket).toBeNull();
 });
 
-test("after a watched resume another $20 hole re-pauses at the hard floor", async () => {
+test("after a watched resume another deep hole re-pauses at the hard floor", async () => {
   const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
   hydrateFlat(trader, [closedLoss(1, -20)]);
   expect(trader.resumeEntries().entriesPaused).toBe(false);
-  hydrateFlat(trader, [closedLoss(1, -20), closedLoss(2, -20)]);
-  expect(trader.snapshot().realizedUsd).toBe(-40);
+  hydrateFlat(trader, [closedLoss(1, -20), closedLoss(2, -60)]);
+  expect(trader.snapshot().realizedUsd).toBe(-80);
   expect(trader.snapshot().entriesPaused).toBe(true);
   expect(trader.snapshot().pauseReason).toBe("floor");
   await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);

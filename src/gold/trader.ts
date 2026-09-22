@@ -220,7 +220,7 @@ export class GoldTrader {
 
   /**
    * Rebase the peak-drawdown gate so a watched room can try again.
-   * Does not close open tickets. The hard -$40 floor cannot be cleared.
+   * Does not close open tickets. The hard floor (default -$80) cannot be cleared.
    */
   resumeEntries(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason: DummyPauseReason | null } {
     const quote = quoteFromTick(this.lastTick);
