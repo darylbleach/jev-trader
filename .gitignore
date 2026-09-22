@@ -4,3 +4,4 @@ data/
 .wrangler
 src/gold/cf/public/
 worker-configuration.d.ts
+gold-export-backups/

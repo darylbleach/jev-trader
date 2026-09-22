@@ -35,23 +35,31 @@ To execute on a broker and copy to follower accounts, attach the EAs in `mt5/`. 
 
 Live now: [https://jev-gold-demo.darylbleach.workers.dev](https://jev-gold-demo.darylbleach.workers.dev). That is the XAUUSD page only, not the Kuru MON-USDC bot. Send that link. It fits a phone (stacked cards, no sideways scroll) and a desktop. Workers cron cannot tick every second, so a Durable Object alarm pulls the live gold spot once a second. That alarm stays armed when the browser is closed. A once-a-minute cron only starts it again if the alarm chain was lost. The public deploy runs `GOLD_MODEL=jev` so Jev decides buy or sell from the live XAUUSD spot. Put `TYPESAFE_AI_API_KEY` as a Worker secret only. Never put that key in wrangler vars, git, or the Worker page.
 
-`/` and `/demo` are the dashboard. `/status` `/signal` `/events` `/tick` `/fill` are the same gold API as `bun run gold`.
+`/` and `/demo` are the dashboard. `/status` `/signal` `/events` `/tick` `/fill` `/export` are the same gold API as `bun run gold`. Closed trades and P/L live in Durable Object SQLite under the `proof` key and are also available from `GET /export`.
 
-To publish a change:
+### Deploy (never skip backup)
+
+**Hard rule:** never deploy the gold demo without a successful `GET /export` backup saved first. Bare `wrangler deploy`, Cloudflare dashboard deploys, and MCP "update worker" paths restart the Durable Object. If `/export` is 404 (persist not live) while `/status` shows trades, that deploy wipes the in-memory book. See `docs/gold-deploy-checklist.md`.
 
 ```
 bun install
-npx wrangler login
-npx wrangler deploy
+bun run gold:backup
+bun run gold:deploy
 ```
 
-Hosted Jev needs the TypeSafe secret (never a wrangler var):
+`gold:deploy` (and `gold:cf`) always curls `/export` first, fail closed when `/status` has a live book but export is missing, then prepares the Worker bundle and runs wrangler. Save the backup JSON under the Project store (`docs/backups/` or `media/backups/`) when working from a Cursor Project:
 
 ```
-npx wrangler secret put TYPESAFE_AI_API_KEY
+GOLD_BACKUP_DIR=/path/to/project-store/docs/backups bun run gold:deploy
 ```
 
-`GOLD_MODEL` is `jev` in wrangler vars. Local preview: `npx wrangler dev` then open `http://127.0.0.1:8787`.
+Do not rename the `GoldRoom` class or the `xauusd-jev` Durable Object name. Do not call `storage.deleteAll()`. Hosted Jev needs the TypeSafe secret (never a wrangler var):
+
+```
+bunx wrangler secret put TYPESAFE_AI_API_KEY
+```
+
+`GOLD_MODEL` is `jev` in wrangler vars. Local preview: `bun run gold:cf:dev` then open `http://127.0.0.1:8787`.
 
 ## Endpoints
 
