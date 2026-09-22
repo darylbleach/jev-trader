@@ -16,7 +16,7 @@ export const GOLD_QUESTIONS = {
     instructions: {
       question: "Will the next XAUUSD push reach the small take profit before the small stop?",
       goal: "Scalp XAUUSD gold vs USD on a forex broker. Take lots of small in and out buys and sells. Aim for a short move that beats the spread (`spreadPips`) plus typical commission. Do not hold for a large trend. Ticks arrive continuously. A decision is made about once per `intervalMs`. The open ticket stays on until its stop or take profit. Your latest buy or sell is the side of the next ticket.",
-      timing: `The order executes as a market order on the next poll from the leader Expert Advisor, usually within a few hundred milliseconds. Every fill has a stop about $${slUsd} away and a take profit about $${tpUsd} away. The stop is wider than the take profit so a small bounce does not end the scalp. Take that small win or cut the loss. Do not sit and wait for a multi dollar move.`,
+      timing: `The order executes as a market order on the next poll from the leader Expert Advisor, usually within a few hundred milliseconds. Buys fill at the ask and sells at the bid. Every fill has a stop about $${slUsd} away and a take profit about $${tpUsd} away. The stop is wider than the take profit so a small bounce does not end the scalp after paying the spread. Take that small win or cut the loss. Do not sit and wait for a multi dollar move.`,
       inputs: "`returnsPips` and `recentMids` show the short path. `spreadPips` is the current bid-ask width in pips. `volume` is tick volume on the last print. If `allowed.buy` is false the trade will not buy, and vice versa.",
     },
     criteria: {

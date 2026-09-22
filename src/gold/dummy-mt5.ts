@@ -4,6 +4,14 @@ import type { DummyCloseReason, DummyFill, DummyTicket, DummyTrade } from "./typ
 
 export type DummySide = "buy" | "sell";
 
+/** Default proof path: buy at ask, sell at bid, exit on the opposing book side. */
+export type DummyFillMode = "book" | "mid";
+
+export interface BookQuote {
+  bid: number;
+  ask: number;
+}
+
 export interface DummyMt5Options {
   lot: number;
   slPoints: number;
@@ -13,6 +21,30 @@ export interface DummyMt5Options {
   historySize: number;
   /** Hold a reverse until mid has moved at least this many points from the open. Default 1. */
   minReversePoints?: number;
+  /**
+   * `book` (default): open buys at ask / sells at bid; SL/TP and floating P and L use the exit side
+   * (bid for buys, ask for sells). `mid` is comparison-only and must be labeled as mid-fill.
+   */
+  fillMode?: DummyFillMode;
+}
+
+export function midOf(quote: BookQuote): number {
+  return (quote.bid + quote.ask) / 2;
+}
+
+/** Entry price for a market ticket under the active fill mode. */
+export function entryPrice(side: DummySide, quote: BookQuote, mode: DummyFillMode): number {
+  if (mode === "mid") return midOf(quote);
+  return side === "buy" ? quote.ask : quote.bid;
+}
+
+/**
+ * Exit / mark price for an open ticket: buys flatten on the bid, sells on the ask.
+ * Mid mode marks and exits at mid for comparison only.
+ */
+export function exitPrice(side: DummySide, quote: BookQuote, mode: DummyFillMode): number {
+  if (mode === "mid") return midOf(quote);
+  return side === "buy" ? quote.bid : quote.ask;
 }
 
 /** True when the live mid has moved enough to justify a dummy reverse close. */
@@ -51,20 +83,22 @@ export function ticketPnl(
   return (closePrice - openPrice) * dir * contractSize * lots;
 }
 
-export function slTpHit(ticket: DummyTicket, mid: number): DummyCloseReason | null {
+/** Judge SL/TP on the exit book side (bid for buys, ask for sells) unless mid mode. */
+export function slTpHit(ticket: DummyTicket, quote: BookQuote, mode: DummyFillMode = "book"): DummyCloseReason | null {
+  const mark = exitPrice(ticket.side, quote, mode);
   if (ticket.side === "buy") {
-    if (mid <= ticket.sl) return "sl";
-    if (mid >= ticket.tp) return "tp";
+    if (mark <= ticket.sl) return "sl";
+    if (mark >= ticket.tp) return "tp";
     return null;
   }
-  if (mid >= ticket.sl) return "sl";
-  if (mid <= ticket.tp) return "tp";
+  if (mark >= ticket.sl) return "sl";
+  if (mark <= ticket.tp) return "tp";
   return null;
 }
 
 /**
- * In-process stand-in for JevLeader market tickets. Opens at mid, attaches SL/TP,
- * and exits on SL/TP touch. An opposite side does not scratch the open ticket.
+ * In-process stand-in for JevLeader market tickets. Default fill mode is the live book:
+ * buy at ask, sell at bid, attach SL/TP from the fill, exit when the opposing side touches.
  */
 export class DummyMt5Account {
   private nextTicket = 1;
@@ -74,8 +108,15 @@ export class DummyMt5Account {
   private wins = 0;
   private losses = 0;
   private last: DummyTrade | null = null;
+  private readonly fillMode: DummyFillMode;
 
-  constructor(private readonly opts: DummyMt5Options) {}
+  constructor(private readonly opts: DummyMt5Options) {
+    this.fillMode = opts.fillMode ?? "book";
+  }
+
+  get mode(): DummyFillMode {
+    return this.fillMode;
+  }
 
   get openTicket(): DummyTicket | null {
     return this.open;
@@ -125,16 +166,18 @@ export class DummyMt5Account {
     this.last = state.last ? { ...state.last } : null;
   }
 
-  floatingPnl(mid: number): number {
+  floatingPnl(quote: BookQuote): number {
     if (!this.open) return 0;
-    return ticketPnl(this.open.side, this.open.openPrice, mid, this.open.lots, this.opts.contractSize);
+    const mark = exitPrice(this.open.side, quote, this.fillMode);
+    return ticketPnl(this.open.side, this.open.openPrice, mark, this.open.lots, this.opts.contractSize);
   }
 
-  snapshot(mid: number) {
+  snapshot(quote: BookQuote) {
     const realizedPnl = this.realized;
-    const floatingPnl = this.floatingPnl(mid);
+    const floatingPnl = this.floatingPnl(quote);
     return {
       enabled: true,
+      fillMode: this.fillMode,
       openTicket: this.open,
       trades: this.trades.slice(),
       lastTicket: this.last,
@@ -148,10 +191,10 @@ export class DummyMt5Account {
     };
   }
 
-  /** Close at the SL or TP price if mid has touched either. */
-  checkStops(mid: number, ts: number): DummyFill | null {
+  /** Close at the SL or TP price if the exit side has touched either. */
+  checkStops(quote: BookQuote, ts: number): DummyFill | null {
     if (!this.open) return null;
-    const hit = slTpHit(this.open, mid);
+    const hit = slTpHit(this.open, quote, this.fillMode);
     if (!hit) return null;
     const closePrice = hit === "sl" ? this.open.sl : this.open.tp;
     return this.closeAt(closePrice, hit, ts);
@@ -160,34 +203,35 @@ export class DummyMt5Account {
   /**
    * Open the wanted side when flat. An opposite buy or sell leaves the ticket
    * alone so the stop and take profit can finish the scalp.
-   * Flatten still closes at mid.
+   * Flatten still closes on the exit book side (or mid in mid mode).
    */
-  sync(want: PositionSide, mid: number, ts: number): DummyFill[] {
+  sync(want: PositionSide, quote: BookQuote, ts: number): DummyFill[] {
     const fills: DummyFill[] = [];
     const have: PositionSide = this.open?.side ?? "flat";
     if (have === want) return fills;
     if (this.open && (want === "buy" || want === "sell")) return fills;
     if (this.open) {
-      const closed = this.closeAt(mid, "signal", ts);
+      const closed = this.closeAt(exitPrice(this.open.side, quote, this.fillMode), "signal", ts);
       if (closed) fills.push(closed);
     }
-    if (want === "buy" || want === "sell") fills.push(this.openAt(want, mid, ts));
+    if (want === "buy" || want === "sell") fills.push(this.openAt(want, quote, ts));
     return fills;
   }
 
-  private openAt(side: DummySide, mid: number, ts: number): DummyFill {
-    const { sl, tp } = stopPrices(side, mid, this.opts.slPoints, this.opts.tpPoints, this.opts.point);
+  private openAt(side: DummySide, quote: BookQuote, ts: number): DummyFill {
+    const price = entryPrice(side, quote, this.fillMode);
+    const { sl, tp } = stopPrices(side, price, this.opts.slPoints, this.opts.tpPoints, this.opts.point);
     const ticket = this.nextTicket++;
     const lots = this.opts.lot;
-    this.open = { ticket, side, lots, openPrice: mid, sl, tp, openTs: ts };
+    this.open = { ticket, side, lots, openPrice: price, sl, tp, openTs: ts };
     return {
       ticket,
       side,
       lots,
-      price: mid,
+      price,
       symbol: "XAUUSD",
       kind: "open",
-      openPrice: mid,
+      openPrice: price,
       sl,
       tp,
       simulated: true,

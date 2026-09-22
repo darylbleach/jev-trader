@@ -83,9 +83,12 @@ interface Snapshot {
   market: "XAUUSD";
   dryRun: boolean;
   dummyMt5?: boolean;
+  fillMode?: "book" | "mid";
   feed?: string;
   latest: GoldSignal | null;
   horizonMs?: number;
+  slPoints?: number;
+  tpPoints?: number;
   totals: {
     ticks: number;
     decisions: number;
@@ -128,7 +131,12 @@ const dummyTape: DummyTrade[] = [];
 const seenFills = new Set<string>();
 let latest: GoldSignal | null = null;
 let horizonMs: number | null = null;
+let slPoints: number | null = null;
+let tpPoints: number | null = null;
+let fillMode: "book" | "mid" = "book";
 let latestMid = 0;
+let latestBid = 0;
+let latestAsk = 0;
 let dummyEnabled = true;
 let openTicket: DummyTicket | null = null;
 let lastTicket: DummyTrade | null = null;
@@ -137,6 +145,11 @@ let totals = { ticks: 0, decisions: 0, lateTicks: 0, fills: 0, jevUsd: 0 };
 
 function pct(n: number): string {
   return `${Math.round(n * 100)}%`;
+}
+
+function markPrice(side: "buy" | "sell"): number {
+  if (fillMode === "mid") return latestMid;
+  return side === "buy" ? latestBid : latestAsk;
 }
 
 function applySnapshot(s: Snapshot): void {
@@ -149,6 +162,9 @@ function applySnapshot(s: Snapshot): void {
   const feed = $("feed");
   if (feed) feed.textContent = s.feed ?? "live";
   if (typeof s.horizonMs === "number" && s.horizonMs > 0) horizonMs = s.horizonMs;
+  if (typeof s.slPoints === "number" && s.slPoints > 0) slPoints = s.slPoints;
+  if (typeof s.tpPoints === "number" && s.tpPoints > 0) tpPoints = s.tpPoints;
+  if (s.fillMode === "book" || s.fillMode === "mid") fillMode = s.fillMode;
   if (s.totals) totals = s.totals;
   dummyEnabled = s.dummyMt5 !== false;
   if (s.openTicket !== undefined) openTicket = s.openTicket;
@@ -181,6 +197,10 @@ function applySnapshot(s: Snapshot): void {
   }
   if (s.latest) {
     latestMid = s.latest.mid;
+    latestBid = s.latest.bid;
+    latestAsk = s.latest.ask;
+    if (typeof s.latest.slPoints === "number") slPoints = s.latest.slPoints;
+    if (typeof s.latest.tpPoints === "number") tpPoints = s.latest.tpPoints;
     renderSignal(s.latest);
   }
   const err = $("offline");
@@ -228,6 +248,9 @@ function renderSignal(s: GoldSignal): void {
 function renderStats(): void {
   const el = $("stats");
   if (!el) return;
+  const tpLabel = tpPoints != null ? `$${(tpPoints * 0.01).toFixed(2)}` : "-";
+  const slLabel = slPoints != null ? `$${(slPoints * 0.01).toFixed(2)}` : "-";
+  const fillLabel = fillMode === "mid" ? "MID (compare)" : "BOOK ask/bid";
   const cells = [
     ["TICKS", String(totals.ticks)],
     ["DECISIONS", String(totals.decisions)],
@@ -236,6 +259,8 @@ function renderStats(): void {
     ["JEV USD", totals.jevUsd.toFixed(4)],
     ["HORIZON", horizonMs ? `${horizonMs / 1000}s` : "-"],
     ["SPREAD", latest ? `${latest.spreadPips.toFixed(1)} pips` : "-"],
+    ["FILL", fillLabel],
+    ["TP / SL", `${tpLabel} / ${slLabel}`],
     ["WINS", String(dummyPnl.wins)],
     ["LOSSES", String(dummyPnl.losses)],
   ];
@@ -317,7 +342,9 @@ function renderDummy(): void {
   const note = $("dummyNote");
   if (note) {
     note.textContent = dummyEnabled
-      ? "Simulated tickets. Not a live broker. Each scalp stays open until the stop or the take profit."
+      ? fillMode === "mid"
+        ? "Simulated mid fills for comparison only. Not broker honest. Default proof path is buy at ask and sell at bid."
+        : "Simulated tickets. Buy at ask, sell at bid. Exit on the opposing side. Not a live broker. Each scalp stays open until the stop or the take profit."
       : "Dummy MT5 is off. Attach the real EAs to see broker fills.";
   }
   const record = $("dummyRecord");
@@ -392,9 +419,9 @@ function onFill(f: GoldFill): void {
     lastTicket = trade;
     openTicket = null;
   }
-  if (openTicket && latestMid) {
+  if (openTicket && (latestBid > 0 || latestAsk > 0 || latestMid > 0)) {
     const dir = openTicket.side === "buy" ? 1 : -1;
-    dummyPnl.floating = (latestMid - openTicket.openPrice) * dir * 100 * openTicket.lots;
+    dummyPnl.floating = (markPrice(openTicket.side) - openTicket.openPrice) * dir * 100 * openTicket.lots;
   }
   renderDummy();
   renderStats();
@@ -442,6 +469,8 @@ function drawChart(): void {
 function onEvent(e: GoldEvent): void {
   mids.push(e.mid);
   latestMid = e.mid;
+  latestBid = e.bid;
+  latestAsk = e.ask;
   if (mids.length > 240) mids.shift();
   if (!e.fill) totals.ticks += 1;
   if (e.late) totals.lateTicks += 1;
@@ -459,7 +488,7 @@ function onEvent(e: GoldEvent): void {
     renderDummy();
   } else if (openTicket) {
     const dir = openTicket.side === "buy" ? 1 : -1;
-    dummyPnl.floating = (e.mid - openTicket.openPrice) * dir * 100 * openTicket.lots;
+    dummyPnl.floating = (markPrice(openTicket.side) - openTicket.openPrice) * dir * 100 * openTicket.lots;
     renderDummy();
   }
   paintQuote(e.bid, e.ask);
