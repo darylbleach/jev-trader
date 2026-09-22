@@ -26,7 +26,7 @@
       <section class="pnl-band" id="pnlBand">
         <div class="pnl-label">
           <span class="section-label">DUMMY MT5 P AND L</span>
-          <span class="sim-tag">simulated</span>
+          <span class="sim-tag">bid/ask fills</span>
         </div>
         <div class="pnl-grid">
           <div class="pnl-card">
@@ -67,7 +67,7 @@
         <div class="right">
           <section class="panel">
             <div class="section-label">STANDING ORDER</div>
-            <p class="order">scalp XAUUSD with small in and out buys and sells from the live bid and ask. the model answers about once a second. no abstaining.</p>
+            <p class="order">scalp XAUUSD with small in and out buys and sells from the live bid and ask. buys fill at the ask. sells fill at the bid. the model answers about once a second. no abstaining.</p>
           </section>
           <section class="panel">
             <div class="section-label">WHICH SIDE THIS TICK?</div>
@@ -95,7 +95,7 @@
         <div class="dummy-head">
           <div>
             <div class="section-label">DUMMY TRADE TAPE</div>
-            <p class="dummy-note" id="dummyNote">Simulated tickets. Not a live broker. Each scalp stays open until the stop or the take profit.</p>
+            <p class="dummy-note" id="dummyNote">Simulated tickets on the live book. Buys fill at ask. Sells fill at bid. Stops and targets are judged on the exit side. Each scalp stays open until the stop or the take profit. Not a live broker.</p>
           </div>
           <div class="dummy-record" id="dummyRecord">W 0  L 0</div>
         </div>
@@ -103,7 +103,7 @@
         <div class="tape dummy-tape" id="dummyTape"></div>
       </section>
 
-      <p class="foot">Experimental gold scalp demo. Jev (or the stand-in) decides small in and out buys or sells from the live XAUUSD spot. The MT5 dummy tape is simulated so you can see opens and closes without a broker. Live broker fills only happen if you attach the MT5 EAs. Not financial advice.</p>
+      <p class="foot">Experimental gold scalp demo. Jev (or the stand-in) decides small in and out buys or sells from the live XAUUSD bid and ask. The MT5 dummy tape fills buys at the ask and sells at the bid so you can score the spread without a broker. Live broker fills only happen if you attach the MT5 EAs. Not financial advice.</p>
     </div>
     <script type="module" src="./demo.ts"></script>
   </body>

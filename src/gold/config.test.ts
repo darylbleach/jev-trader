@@ -1,20 +1,28 @@
 import { expect, test } from "bun:test";
-import { GOLD_DEFAULT_HORIZON_MS, GOLD_DEFAULT_SL_POINTS, GOLD_DEFAULT_TP_POINTS, goldConfig, parsePositiveInt } from "./config";
+import {
+  GOLD_DEFAULT_HORIZON_MS,
+  GOLD_DEFAULT_SL_POINTS,
+  GOLD_DEFAULT_TP_POINTS,
+  goldConfig,
+  parsePositiveInt,
+} from "./config";
 
-test("gold SL and TP defaults are a quick scalp, not a multi dollar hold", () => {
-  expect(GOLD_DEFAULT_SL_POINTS).toBe(100);
-  expect(GOLD_DEFAULT_TP_POINTS).toBe(60);
-  expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBeCloseTo(1);
-  expect(GOLD_DEFAULT_TP_POINTS * 0.01).toBeCloseTo(0.6);
+test("gold SL and TP defaults clear a typical half dollar XAUUSD spread", () => {
+  expect(GOLD_DEFAULT_SL_POINTS).toBe(250);
+  expect(GOLD_DEFAULT_TP_POINTS).toBe(150);
+  expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBeCloseTo(2.5);
+  expect(GOLD_DEFAULT_TP_POINTS * 0.01).toBeCloseTo(1.5);
   expect(GOLD_DEFAULT_SL_POINTS).toBeGreaterThan(GOLD_DEFAULT_TP_POINTS);
-  expect(GOLD_DEFAULT_SL_POINTS).toBeGreaterThan(15);
-  expect(GOLD_DEFAULT_SL_POINTS).toBeLessThanOrEqual(150);
-  expect(GOLD_DEFAULT_TP_POINTS).toBeLessThanOrEqual(200);
-  expect(GOLD_DEFAULT_SL_POINTS * 0.01).toBeGreaterThan(0.15);
+  // Target must beat a ~$0.50 Swissquote-style book with margin.
+  expect(GOLD_DEFAULT_TP_POINTS * 0.01).toBeGreaterThan(0.5 + 0.5);
+  // After buy-at-ask, exit bid sits ~$0.50 toward the stop; leave bounce room.
+  expect(GOLD_DEFAULT_SL_POINTS * 0.01 - 0.5).toBeGreaterThanOrEqual(1.5);
+  expect(GOLD_DEFAULT_SL_POINTS).toBeLessThanOrEqual(400);
+  expect(GOLD_DEFAULT_TP_POINTS).toBeLessThanOrEqual(300);
 });
 
 test("gold horizon is a short scalp window and decisions stay frequent", () => {
-  expect(GOLD_DEFAULT_HORIZON_MS).toBe(6000);
+  expect(GOLD_DEFAULT_HORIZON_MS).toBe(12000);
   expect(goldConfig.horizonMs).toBe(GOLD_DEFAULT_HORIZON_MS);
   expect(goldConfig.intervalMs).toBeLessThanOrEqual(1000);
   expect(goldConfig.reverse).toBe(true);

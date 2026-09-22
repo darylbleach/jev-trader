@@ -129,6 +129,8 @@ const seenFills = new Set<string>();
 let latest: GoldSignal | null = null;
 let horizonMs: number | null = null;
 let latestMid = 0;
+let latestBid = 0;
+let latestAsk = 0;
 let dummyEnabled = true;
 let openTicket: DummyTicket | null = null;
 let lastTicket: DummyTrade | null = null;
@@ -191,6 +193,8 @@ function applySnapshot(s: Snapshot): void {
 }
 
 function paintQuote(bid: number, ask: number): void {
+  latestBid = bid;
+  latestAsk = ask;
   const bidEl = $("bid");
   const askEl = $("ask");
   if (bidEl) bidEl.textContent = bid.toFixed(2);
@@ -251,6 +255,17 @@ function money(n: number): string {
 
 function tone(n: number): string {
   return n > 0 ? "up" : n < 0 ? "down" : "";
+}
+
+function markPrice(side: "buy" | "sell"): number {
+  if (side === "buy") return latestBid || latestMid;
+  return latestAsk || latestMid;
+}
+
+function floatingFromOpen(): number {
+  if (!openTicket) return 0;
+  const dir = openTicket.side === "buy" ? 1 : -1;
+  return (markPrice(openTicket.side) - openTicket.openPrice) * dir * 100 * openTicket.lots;
 }
 
 function closeVerb(reason: DummyTrade["reason"]): string {
@@ -317,7 +332,7 @@ function renderDummy(): void {
   const note = $("dummyNote");
   if (note) {
     note.textContent = dummyEnabled
-      ? "Simulated tickets. Not a live broker. Each scalp stays open until the stop or the take profit."
+      ? "Simulated tickets on the live book. Buys fill at ask. Sells fill at bid. Stops and targets are judged on the exit side. Each scalp stays open until the stop or the take profit. Not a live broker."
       : "Dummy MT5 is off. Attach the real EAs to see broker fills.";
   }
   const record = $("dummyRecord");
@@ -392,9 +407,8 @@ function onFill(f: GoldFill): void {
     lastTicket = trade;
     openTicket = null;
   }
-  if (openTicket && latestMid) {
-    const dir = openTicket.side === "buy" ? 1 : -1;
-    dummyPnl.floating = (latestMid - openTicket.openPrice) * dir * 100 * openTicket.lots;
+  if (openTicket) {
+    dummyPnl.floating = floatingFromOpen();
   }
   renderDummy();
   renderStats();
@@ -458,8 +472,7 @@ function onEvent(e: GoldEvent): void {
     if (e.lastTicket !== undefined) lastTicket = e.lastTicket;
     renderDummy();
   } else if (openTicket) {
-    const dir = openTicket.side === "buy" ? 1 : -1;
-    dummyPnl.floating = (e.mid - openTicket.openPrice) * dir * 100 * openTicket.lots;
+    dummyPnl.floating = floatingFromOpen();
     renderDummy();
   }
   paintQuote(e.bid, e.ask);

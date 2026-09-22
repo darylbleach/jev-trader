@@ -1,11 +1,16 @@
 import { goldConfig } from "./config";
-import { DummyMt5Account } from "./dummy-mt5";
+import { DummyMt5Account, type DummyBook } from "./dummy-mt5";
 import type { GoldModel } from "./model-mock";
 import { holdScalp, type PositionSide } from "./policy";
 import { type GoldProofState, PROOF_STATE_VERSION } from "./proof-state";
 import { MidRing, type GoldTick } from "./state";
 import { DecisionThrottle } from "./throttle";
 import type { DummyPnL, DummyTicket, DummyTrade, GoldEvent, GoldFill, GoldSignal, GoldTotals } from "./types";
+
+function bookFromTick(tick: GoldTick | null, fallbackPrice = 0): DummyBook {
+  if (!tick) return { bid: fallbackPrice, ask: fallbackPrice };
+  return { bid: tick.bid, ask: tick.ask };
+}
 
 function createDummyAccount(): DummyMt5Account | null {
   if (!goldConfig.dummyMt5) return null;
@@ -96,19 +101,20 @@ export class GoldTrader {
         this.position = this.dummy.openTicket?.side ?? "flat";
       }
     }
-    const mid = this.lastTick ? (this.lastTick.bid + this.lastTick.ask) / 2 : 0;
-    this.refreshPnL(mid);
+    const book = bookFromTick(this.lastTick);
+    this.refreshPnL(book);
   }
 
   snapshot() {
-    const mid = this.lastTick ? (this.lastTick.bid + this.lastTick.ask) / 2 : 0;
-    const dummy = this.refreshPnL(mid);
+    const book = bookFromTick(this.lastTick);
+    const dummy = this.refreshPnL(book);
     return {
       model: this.model.name,
       market: "XAUUSD" as const,
       dryRun: goldConfig.dryRun,
       dummyMt5: this.dummy !== null,
       simulated: this.dummy !== null,
+      fillMode: this.dummy !== null ? ("bid_ask" as const) : null,
       startedAt: this.startedAt,
       intervalMs: goldConfig.intervalMs,
       horizonMs: goldConfig.horizonMs,
@@ -142,7 +148,7 @@ export class GoldTrader {
     };
   }
 
-  private dummySnapshot(mid: number): {
+  private dummySnapshot(book: DummyBook): {
     openTicket: DummyTicket | null;
     trades: DummyTrade[];
     lastTicket: DummyTrade | null;
@@ -168,11 +174,11 @@ export class GoldTrader {
         losses: 0,
       };
     }
-    return this.dummy.snapshot(mid);
+    return this.dummy.snapshot(book);
   }
 
-  private refreshPnL(mid: number) {
-    const dummy = this.dummySnapshot(mid);
+  private refreshPnL(book: DummyBook) {
+    const dummy = this.dummySnapshot(book);
     this.totals.realizedUsd = dummy.realizedUsd;
     this.totals.unrealizedUsd = dummy.unrealizedUsd;
     this.totals.pnlUsd = dummy.pnlUsd;
@@ -181,8 +187,8 @@ export class GoldTrader {
     return dummy;
   }
 
-  private decorate(event: GoldEvent, mid: number): GoldEvent {
-    const dummy = this.refreshPnL(mid);
+  private decorate(event: GoldEvent, book: DummyBook): GoldEvent {
+    const dummy = this.refreshPnL(book);
     const pnl: DummyPnL = {
       realizedUsd: dummy.realizedUsd,
       unrealizedUsd: dummy.unrealizedUsd,
@@ -201,8 +207,9 @@ export class GoldTrader {
     this.totals.ticks++;
     this.lastTick = tick;
     const mid = (tick.bid + tick.ask) / 2;
+    const book = bookFromTick(tick);
     this.ring.push(mid);
-    this.applyDummyStops(mid, now);
+    this.applyDummyStops(book, now);
     if (this.dummy) this.position = this.dummy.openTicket?.side ?? "flat";
 
     const gate = this.throttle.tryStart(now);
@@ -218,7 +225,7 @@ export class GoldTrader {
         fill: null,
         late: true,
         lateReason: gate.reason,
-      }, mid);
+      }, book);
       this.onEvent(this.pushHistory(event));
       return;
     }
@@ -247,7 +254,7 @@ export class GoldTrader {
           fill: null,
           late: true,
           lateReason: "busy",
-        }, state.mid);
+        }, book);
         this.onEvent(this.pushHistory(event));
         return;
       }
@@ -258,7 +265,7 @@ export class GoldTrader {
       if (action === "buy" || action === "sell") {
         this.position = holdScalp(this.position, action);
       }
-      this.syncDummy(this.position, mid, now);
+      this.syncDummy(this.position, book, now);
       if (this.dummy) {
         this.position = this.dummy.openTicket?.side ?? "flat";
       }
@@ -292,7 +299,7 @@ export class GoldTrader {
         decision: signal,
         fill: null,
         late: false,
-      }, state.mid);
+      }, book);
       this.onEvent(this.pushHistory(event));
       this.onSignal(signal);
     } finally {
@@ -307,16 +314,17 @@ export class GoldTrader {
     this.totals.fills++;
     const tick = this.lastTick;
     const mid = tick ? (tick.bid + tick.ask) / 2 : recorded.price;
+    const book = bookFromTick(tick, recorded.price);
     const event = this.decorate({
       ts: recorded.ts ?? Date.now(),
       mid,
-      bid: tick?.bid ?? recorded.price,
-      ask: tick?.ask ?? recorded.price,
+      bid: book.bid,
+      ask: book.ask,
       spreadPips: this.lastSignal?.spreadPips ?? 0,
       decision: this.lastSignal,
       fill: recorded,
       late: false,
-    }, mid);
+    }, book);
     this.onEvent(this.pushHistory(event));
     this.onFill(recorded);
     this.onProofChange();
@@ -327,19 +335,19 @@ export class GoldTrader {
     return recorded;
   }
 
-  private applyDummyStops(mid: number, now: number): void {
+  private applyDummyStops(book: DummyBook, now: number): void {
     if (!this.dummy) return;
-    const fill = this.dummy.checkStops(mid, now);
+    const fill = this.dummy.checkStops(book, now);
     if (fill) this.reportFill(fill);
   }
 
-  private syncDummy(want: PositionSide, mid: number, now: number): void {
+  private syncDummy(want: PositionSide, book: DummyBook, now: number): void {
     if (!this.dummy) return;
-    for (const fill of this.dummy.sync(want, mid, now)) this.reportFill(fill);
+    for (const fill of this.dummy.sync(want, book, now)) this.reportFill(fill);
   }
 
   private pushHistory(event: GoldEvent): GoldEvent {
-    const decorated = this.decorate(event, event.mid);
+    const decorated = this.decorate(event, { bid: event.bid, ask: event.ask });
     this.history.push(decorated);
     if (this.history.length > goldConfig.historySize) this.history.shift();
     return decorated;

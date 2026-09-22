@@ -35,8 +35,8 @@ test("parseProofState rejects garbage", () => {
 
 test("dummy account export and hydrate round-trips closed trades and P/L", () => {
   const a = new DummyMt5Account(opts);
-  a.sync("buy", 2650, 1_000);
-  a.checkStops(2658, 2_000);
+  a.sync("buy", { bid: 2650, ask: 2650 }, 1_000);
+  a.checkStops({ bid: 2658, ask: 2658 }, 2_000);
   expect(a.closedTrades).toHaveLength(1);
   expect(a.realizedPnl).toBeCloseTo(8);
   expect(a.winCount).toBe(1);
@@ -54,12 +54,12 @@ test("dummy account export and hydrate round-trips closed trades and P/L", () =>
 
 test("dummy hydrate restores an open ticket and next id", () => {
   const a = new DummyMt5Account(opts);
-  a.sync("sell", 2650, 1_000);
+  a.sync("sell", { bid: 2650, ask: 2650 }, 1_000);
   const b = new DummyMt5Account(opts);
   b.hydrate(a.exportState());
   expect(b.openTicket?.side).toBe("sell");
   expect(b.openTicket?.openPrice).toBe(2650);
-  const fills = b.sync("flat", 2649, 2_000);
+  const fills = b.sync("flat", { bid: 2649, ask: 2649 }, 2_000);
   expect(fills[0]?.ticket).toBe(1);
   expect(b.exportState().nextTicket).toBe(2);
 });
