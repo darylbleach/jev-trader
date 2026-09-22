@@ -49,6 +49,10 @@ export class GoldTrader {
   };
   private lastError: string | null = null;
   private dummy: DummyMt5Account | null;
+  /** Sticky: once realized hits the pause floor, block new entries until resumeEntries(). */
+  private entriesPaused = false;
+  /** After a manual resume below the floor, stay disarmed until realized recovers above it. */
+  private pauseArmed = true;
   startedAt: number;
 
   onEvent: (e: GoldEvent) => void = () => {};
@@ -104,6 +108,7 @@ export class GoldTrader {
     }
     const quote = quoteFromTick(this.lastTick);
     this.refreshPnL(quote);
+    this.updateEntryPause(this.totals.realizedUsd);
   }
 
   snapshot() {
@@ -122,6 +127,8 @@ export class GoldTrader {
       lot: goldConfig.lot,
       slPoints: goldConfig.slPoints,
       tpPoints: goldConfig.tpPoints,
+      pauseRealizedUsd: goldConfig.pauseRealizedUsd,
+      entriesPaused: this.entriesPaused,
       reverse: goldConfig.reverse,
       position: this.position,
       latest: this.lastSignal,
@@ -204,6 +211,33 @@ export class GoldTrader {
     return this.lastSignal;
   }
 
+  /**
+   * Clear the drawdown entry pause. Does not close open tickets.
+   * Re-arms only after realizedUsd climbs back above the pause floor.
+   */
+  resumeEntries(): { ok: true; entriesPaused: boolean; realizedUsd: number } {
+    this.entriesPaused = false;
+    this.pauseArmed = false;
+    const quote = quoteFromTick(this.lastTick);
+    const dummy = this.refreshPnL(quote);
+    this.onProofChange();
+    return { ok: true, entriesPaused: this.entriesPaused, realizedUsd: dummy.realizedUsd };
+  }
+
+  private updateEntryPause(realizedUsd: number): void {
+    const floor = goldConfig.pauseRealizedUsd;
+    if (floor === null) {
+      this.entriesPaused = false;
+      this.pauseArmed = true;
+      return;
+    }
+    if (realizedUsd > floor) {
+      this.pauseArmed = true;
+      return;
+    }
+    if (this.pauseArmed) this.entriesPaused = true;
+  }
+
   async onTick(tick: GoldTick, now = Date.now()): Promise<void> {
     this.totals.ticks++;
     this.lastTick = tick;
@@ -263,13 +297,22 @@ export class GoldTrader {
       this.totals.jevUsd += (decision.inputTokens / 1e6) * goldConfig.jevUsdPerMTok;
 
       const action = decision.action;
+      let want: PositionSide = this.position;
       if (action === "buy" || action === "sell") {
-        this.position = holdScalp(this.position, action);
+        want = holdScalp(this.position, action);
       }
+      const preQuote = quoteFromTick(this.lastTick, mid);
+      this.updateEntryPause(this.refreshPnL(preQuote).realizedUsd);
+      // Pause only blocks new entries from flat; open scalps still hold until SL/TP.
+      if (this.entriesPaused && this.position === "flat") {
+        want = "flat";
+      }
+      this.position = want;
       this.syncDummy(this.position, quote, now);
       if (this.dummy) {
         this.position = this.dummy.openTicket?.side ?? "flat";
       }
+      this.updateEntryPause(this.refreshPnL(quote).realizedUsd);
 
       const signal: GoldSignal = {
         ts: now,
@@ -328,6 +371,7 @@ export class GoldTrader {
     }, quote);
     this.onEvent(this.pushHistory(event));
     this.onFill(recorded);
+    this.updateEntryPause(this.totals.realizedUsd);
     this.onProofChange();
     if (!this.dummy && (recorded.reason === "sl" || recorded.reason === "tp")) {
       this.position = "flat";

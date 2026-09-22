@@ -1,16 +1,22 @@
 const env = (key: string, fallback?: string) => process.env[key] ?? fallback;
 
 /**
- * XAUUSD scalp stop for bid/ask proof fills. SYMBOL_POINT 0.01 → 200 points is $2.00.
+ * XAUUSD scalp stop for bid/ask proof fills. SYMBOL_POINT 0.01 → 300 points is $3.00.
  * Live Swissquote-style book is ~$0.50 wide. Buy at ask starts ~$0.50 underwater on the bid,
- * so mark travel to a $2.00 stop is ~$1.50 (SL minus spread). Matches TP mark travel below.
+ * so mark travel to a $3.00 stop is ~$2.50 (SL minus spread). Matches TP mark travel below.
  */
-export const GOLD_DEFAULT_SL_POINTS = 200;
+export const GOLD_DEFAULT_SL_POINTS = 300;
 /**
- * Take profit: 100 points is $1.00. Clears the ~$0.50 spread with room: after buy at ask,
- * bid must travel spread + TP ≈ $1.50 to bank, equal to the SL path. Not a multi dollar hold.
+ * Take profit: 200 points is $2.00. Clears the ~$0.50 spread with room: after buy at ask,
+ * bid must travel spread + TP ≈ $2.50 to bank, equal to the SL path. Cash breakeven WR is 60%.
  */
-export const GOLD_DEFAULT_TP_POINTS = 100;
+export const GOLD_DEFAULT_TP_POINTS = 200;
+/**
+ * Pause new dummy entries when realized P/L is at or below this USD level until POST /resume.
+ * Set GOLD_PAUSE_REALIZED_USD=off (or empty with no default use) via a non-numeric value to disable.
+ * Default -20 stops digging after a hole like the post-#14 book tape (~-$22 at ~53% WR).
+ */
+export const GOLD_DEFAULT_PAUSE_REALIZED_USD = -20;
 /** Short near-term window Jev is asked about. Not a swing hold. */
 export const GOLD_DEFAULT_HORIZON_MS = 6000;
 
@@ -32,6 +38,22 @@ export function parsePositiveInt(raw: string | undefined, fallback: number): num
   return Math.floor(n);
 }
 
+/**
+ * Drawdown pause floor in USD. Empty / missing → default. `off` / `false` / `none` → disabled (null).
+ * Non-numeric junk falls back to default so a typo cannot silently disable the safeguard.
+ */
+export function parsePauseRealizedUsd(
+  raw: string | undefined,
+  fallback: number | null = GOLD_DEFAULT_PAUSE_REALIZED_USD,
+): number | null {
+  if (raw === undefined || raw === "") return fallback;
+  const v = raw.trim().toLowerCase();
+  if (v === "off" || v === "false" || v === "none" || v === "disable" || v === "disabled") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return n;
+}
+
 export const goldConfig = {
   port: Number(env("GOLD_PORT", "3001")),
   intervalMs: Number(env("GOLD_INTERVAL_MS", "1000")),
@@ -49,6 +71,8 @@ export const goldConfig = {
    * `mid` is comparison-only and must not be treated as broker-honest proof.
    */
   fillMode: parseFillMode(env("GOLD_FILL_MODE"), "book"),
+  /** When set, block new entries once realizedUsd is at or below this level until resumeEntries(). */
+  pauseRealizedUsd: parsePauseRealizedUsd(env("GOLD_PAUSE_REALIZED_USD")),
   reverse: env("GOLD_REVERSE", "true") !== "false",
   /**
    * Dummy reverse only after the live mid has moved at least this many points.

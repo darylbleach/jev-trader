@@ -17,6 +17,7 @@ export interface GoldHttpTrader {
   onTick(tick: { bid: number; ask: number; volume?: number; ts?: number }): Promise<void>;
   reportFill(fill: GoldFill): GoldFill;
   exportProof?(now?: number): unknown;
+  resumeEntries?(): { ok: true; entriesPaused: boolean; realizedUsd: number };
 }
 
 export const CORS = {
@@ -130,6 +131,10 @@ export async function handleGoldHttp(
   if (pathname === "/export" && request.method === "GET") {
     if (typeof trader.exportProof !== "function") return json({ error: "export unavailable" }, 501);
     return json(trader.exportProof(Date.now()));
+  }
+  if (pathname === "/resume" && request.method === "POST") {
+    if (typeof trader.resumeEntries !== "function") return json({ error: "resume unavailable" }, 501);
+    return json(trader.resumeEntries());
   }
   if (pathname === "/signal" && request.method === "GET") {
     const latest = trader.signal();
