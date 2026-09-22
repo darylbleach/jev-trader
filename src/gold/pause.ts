@@ -1,6 +1,6 @@
 import type { DummyTrade } from "./types";
 
-export type DummyPauseReason = "drawdown" | "floor";
+export type DummyPauseReason = "drawdown" | "floor" | "manual";
 
 export interface DummyPauseGate {
   pause: boolean;

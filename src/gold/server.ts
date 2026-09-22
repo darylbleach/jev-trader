@@ -36,6 +36,7 @@ export function startGoldServer(trader: GoldTrader, meta: Meta) {
       if ((pathname === "/status" || pathname === "/api") && req.method === "GET") return json({ ...trader.snapshot(), ...meta });
       if (pathname === "/history" && req.method === "GET") return json(trader.history);
       if (pathname === "/export" && req.method === "GET") return json(trader.exportProof());
+      if ((pathname === "/pause" || pathname === "/entries/pause") && req.method === "POST") return json(trader.pauseEntries());
       if (pathname === "/resume" && req.method === "POST") return json(trader.resumeEntries());
       if (pathname === "/signal" && req.method === "GET") {
         const latest = trader.signal();

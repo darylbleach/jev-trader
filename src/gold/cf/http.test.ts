@@ -127,3 +127,24 @@ test("POST /resume clears the entry pause", async () => {
   expect(body.entriesPaused).toBe(false);
   expect(body.realizedUsd).toBe(-22);
 });
+
+test("POST /pause and /entries/pause set the entry pause latch", async () => {
+  let paused = false;
+  const trader = fakeTrader({
+    pauseEntries() {
+      paused = true;
+      return { ok: true as const, entriesPaused: paused, realizedUsd: -50, pauseReason: "manual" as const };
+    },
+  });
+  const hub = createSseHub();
+  const missing = await handleGoldHttp(new Request("https://demo.test/pause", { method: "POST" }), fakeTrader(), meta, hub);
+  expect(missing.status).toBe(501);
+  const res = await handleGoldHttp(new Request("https://demo.test/pause", { method: "POST" }), trader, meta, hub);
+  expect(res.status).toBe(200);
+  const body = await res.json() as { ok: boolean; entriesPaused: boolean; pauseReason: string };
+  expect(body.ok).toBe(true);
+  expect(body.entriesPaused).toBe(true);
+  expect(body.pauseReason).toBe("manual");
+  const alias = await handleGoldHttp(new Request("https://demo.test/entries/pause", { method: "POST" }), trader, meta, hub);
+  expect(alias.status).toBe(200);
+});

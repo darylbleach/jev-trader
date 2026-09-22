@@ -22,6 +22,13 @@ export interface GoldProofState {
   position: PositionSide;
   totals: Pick<GoldTotals, "ticks" | "decisions" | "lateTicks" | "fills" | "jevUsd">;
   dummy: DummyMt5Persisted | null;
+  /**
+   * Operator latch from POST /pause. Survives deploy and DO hibernation.
+   * Optional for older blobs; missing means false.
+   */
+  entriesForcePaused?: boolean;
+  /** Session peak used by the drawdown gate. Optional for older blobs. */
+  realizedPeak?: number;
 }
 
 export function emptyProofTotals(): GoldProofState["totals"] {
@@ -132,6 +139,9 @@ export function parseProofState(raw: unknown): GoldProofState | null {
   if (ticks === null || decisions === null || lateTicks === null || fills === null || jevUsd === null) return null;
   const dummy = parseDummy(o.dummy);
   if (o.dummy !== null && dummy === null) return null;
+  const entriesForcePaused = o.entriesForcePaused === true ? true : o.entriesForcePaused === false ? false : undefined;
+  const realizedPeak = o.realizedPeak === undefined ? undefined : num(o.realizedPeak);
+  if (o.realizedPeak !== undefined && realizedPeak === null) return null;
   return {
     version: PROOF_STATE_VERSION,
     savedAt,
@@ -140,5 +150,7 @@ export function parseProofState(raw: unknown): GoldProofState | null {
     position: o.position,
     totals: { ticks, decisions, lateTicks, fills, jevUsd },
     dummy,
+    ...(entriesForcePaused !== undefined ? { entriesForcePaused } : {}),
+    ...(realizedPeak !== undefined ? { realizedPeak } : {}),
   };
 }
