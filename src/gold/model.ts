@@ -16,12 +16,12 @@ export const GOLD_QUESTIONS = {
     instructions: {
       question: "Will the next XAUUSD push reach the small take profit before the small stop?",
       goal: "Scalp XAUUSD gold vs USD on a forex broker. Take lots of small in and out buys and sells. Aim for a short move that beats the spread (`spreadPips`) plus typical commission. Do not hold for a large trend. Ticks arrive continuously. A decision is made about once per `intervalMs`. The open ticket stays on until its stop or take profit. Your latest buy or sell is the side of the next ticket.",
-      timing: `The order executes as a market order on the next poll from the leader Expert Advisor, usually within a few hundred milliseconds. Buys fill at the ask and sells at the bid. Every fill has a stop about $${slUsd} away and a take profit about $${tpUsd} away. The stop is wider than the take profit so a small bounce does not end the scalp after paying the spread. Take that small win or cut the loss. Do not sit and wait for a multi dollar move.`,
+      timing: `The order executes as a market order on the next poll from the leader Expert Advisor, usually within a few hundred milliseconds. Buys fill at the ask and sells at the bid. Every fill has a take profit about $${tpUsd} away and a stop about $${slUsd} away. The take profit is larger than the stop so a near coin-flip win rate can still have positive cash expectancy after the spread. Bank the $${tpUsd} win or cut the smaller $${slUsd} loss. Do not sit and wait for a multi dollar trend.`,
       inputs: "`returnsPips` and `recentMids` show the short path. `spreadPips` is the current bid-ask width in pips. `volume` is tick volume on the last print. If `allowed.buy` is false the trade will not buy, and vice versa.",
     },
     criteria: {
-      buy: `Buy gold now for a small scalp: price is more likely to rise about $${tpUsd} (the take profit) before it falls about $${slUsd} (the stop). The move needs to beat the spread and commission. Do not wait for a large uptrend.`,
-      sell: `Sell gold now for a small scalp: price is more likely to fall about $${tpUsd} (the take profit) before it rises about $${slUsd} (the stop). The move needs to beat the spread and commission. Do not wait for a large downtrend.`,
+      buy: `Buy gold now for a small scalp: price is more likely to rise about $${tpUsd} (the take profit) before it falls about $${slUsd} (the stop). The move needs to beat the spread and commission. Prefer a clean push over a choppy scratch.`,
+      sell: `Sell gold now for a small scalp: price is more likely to fall about $${tpUsd} (the take profit) before it rises about $${slUsd} (the stop). The move needs to beat the spread and commission. Prefer a clean push over a choppy scratch.`,
     },
   },
 } as const;
