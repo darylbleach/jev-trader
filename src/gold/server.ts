@@ -35,6 +35,7 @@ export function startGoldServer(trader: GoldTrader, meta: Meta) {
       if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
       if ((pathname === "/status" || pathname === "/api") && req.method === "GET") return json({ ...trader.snapshot(), ...meta });
       if (pathname === "/history" && req.method === "GET") return json(trader.history);
+      if (pathname === "/export" && req.method === "GET") return json(trader.exportProof());
       if (pathname === "/signal" && req.method === "GET") {
         const latest = trader.signal();
         return latest ? json(latest) : json({ error: "no signal yet" }, 404);

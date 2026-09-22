@@ -1,4 +1,5 @@
 import type { PositionSide } from "./policy";
+import type { DummyMt5Persisted } from "./proof-state";
 import type { DummyCloseReason, DummyFill, DummyTicket, DummyTrade } from "./types";
 
 export type DummySide = "buy" | "sell";
@@ -98,6 +99,30 @@ export class DummyMt5Account {
 
   get lossCount(): number {
     return this.losses;
+  }
+
+  /** Snapshot for Durable Object / file persistence. Survives process and DO restarts. */
+  exportState(): DummyMt5Persisted {
+    return {
+      nextTicket: this.nextTicket,
+      open: this.open ? { ...this.open } : null,
+      trades: this.trades.map((t) => ({ ...t })),
+      realized: this.realized,
+      wins: this.wins,
+      losses: this.losses,
+      last: this.last ? { ...this.last } : null,
+    };
+  }
+
+  /** Restore closed trades, open ticket, and aggregates from durable storage. */
+  hydrate(state: DummyMt5Persisted): void {
+    this.nextTicket = state.nextTicket;
+    this.open = state.open ? { ...state.open } : null;
+    this.trades = state.trades.map((t) => ({ ...t }));
+    this.realized = state.realized;
+    this.wins = state.wins;
+    this.losses = state.losses;
+    this.last = state.last ? { ...state.last } : null;
   }
 
   floatingPnl(mid: number): number {

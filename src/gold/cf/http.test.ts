@@ -42,6 +42,9 @@ function fakeTrader(overrides: Partial<GoldHttpTrader> = {}): GoldHttpTrader {
       fills.push(fill);
       return fill;
     },
+    exportProof() {
+      return { version: 1, savedAt: 1, startedAt: 1, seq: 0, position: "flat", totals: { ticks: 0, decisions: 0, lateTicks: 0, fills: 0, jevUsd: 0 }, dummy: null };
+    },
     ...overrides,
   };
 }
@@ -94,4 +97,14 @@ test("GET /events is an SSE snapshot stream", async () => {
   expect(text).not.toContain("\u2014");
   await reader!.cancel();
   expect(hub.size).toBe(0);
+});
+
+test("GET /export returns the proof blob", async () => {
+  const trader = fakeTrader();
+  const hub = createSseHub();
+  const res = await handleGoldHttp(new Request("https://demo.test/export"), trader, meta, hub);
+  expect(res.status).toBe(200);
+  const body = await res.json() as { version: number; position: string };
+  expect(body.version).toBe(1);
+  expect(body.position).toBe("flat");
 });

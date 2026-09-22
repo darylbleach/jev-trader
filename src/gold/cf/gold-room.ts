@@ -2,6 +2,10 @@ import { DurableObject } from "cloudflare:workers";
 import { keepGoldAlarm } from "./alarm";
 import { applyWorkerEnv } from "./env";
 import { createSseHub, handleGoldHttp, type GoldHttpTrader, type GoldMeta, type SseHub } from "./http";
+import { parseProofState, type GoldProofState } from "../proof-state";
+
+/** Durable Object storage key for closed trades, P/L, and session counters. */
+export const PROOF_STORAGE_KEY = "proof";
 
 /**
  * One shared XAUUSD demo room so every viewer sees the same tape.
@@ -10,6 +14,9 @@ import { createSseHub, handleGoldHttp, type GoldHttpTrader, type GoldMeta, type 
  * While GOLD_DEMO is on, that alarm stays armed after the browser closes.
  * Workers cron is once a minute at best, so it only re-arms a lost alarm.
  * GOLD_MODEL=jev boots GoldJevModel via createGoldModel after applyWorkerEnv.
+ *
+ * Trade history and P/L live in DO SQLite storage under `proof`. In-memory
+ * GoldTrader / DummyMt5Account alone do not survive hibernation or deploys.
  */
 export class GoldRoom extends DurableObject<Env> {
   private trader: GoldHttpTrader | null = null;
@@ -23,6 +30,7 @@ export class GoldRoom extends DurableObject<Env> {
   private intervalMs = 1000;
   private refreshMs = 1000;
   private demo = true;
+  private proofDirty = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -52,13 +60,16 @@ export class GoldRoom extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const trader = await this.boot();
     await this.ensureTicking();
-    return handleGoldHttp(request, trader, this.meta!, this.hub);
+    const res = await handleGoldHttp(request, trader, this.meta!, this.hub);
+    if (this.proofDirty) await this.flushProof();
+    return res;
   }
 
   async alarm(): Promise<void> {
     try {
       const trader = await this.boot();
       await this.stepLiveTick(trader);
+      await this.flushProof();
     } catch (err) {
       console.error("gold alarm", err instanceof Error ? err.message : String(err));
     }
@@ -79,6 +90,11 @@ export class GoldRoom extends DurableObject<Env> {
     const trader = new GoldTrader(model);
     this.intervalMs = goldConfig.intervalMs > 0 ? goldConfig.intervalMs : 1000;
     this.refreshMs = goldConfig.spotRefreshMs > 0 ? goldConfig.spotRefreshMs : 1000;
+
+    const storedProof = await this.ctx.storage.get<unknown>(PROOF_STORAGE_KEY);
+    const proof = parseProofState(storedProof);
+    if (proof) trader.hydrateProof(proof);
+
     this.meta = {
       model: model.name,
       market: "XAUUSD",
@@ -89,7 +105,13 @@ export class GoldRoom extends DurableObject<Env> {
     };
     trader.onEvent = (e) => this.hub.broadcast(e.fill ? "fill" : e.late ? "late" : "tick", e);
     trader.onSignal = (s) => this.hub.broadcast("signal", s);
-    trader.onFill = (f) => this.hub.broadcast("fill", f);
+    trader.onFill = (f) => {
+      this.hub.broadcast("fill", f);
+      this.proofDirty = true;
+    };
+    trader.onProofChange = () => {
+      this.proofDirty = true;
+    };
     this.trader = trader;
     const stored = await this.ctx.storage.get<number>("mid");
     const storedLive = await this.ctx.storage.get<boolean>("live");
@@ -99,6 +121,15 @@ export class GoldRoom extends DurableObject<Env> {
       if (this.meta) this.meta.feed = this.live ? "live" : "demo";
     }
     return trader;
+  }
+
+  private async flushProof(): Promise<void> {
+    const trader = this.trader;
+    if (!trader || typeof trader.exportProof !== "function") return;
+    const proof: GoldProofState = trader.exportProof(Date.now());
+    await this.ctx.storage.put(PROOF_STORAGE_KEY, proof);
+    if (this.meta) this.meta.startedAt = proof.startedAt;
+    this.proofDirty = false;
   }
 
   private async stepLiveTick(trader: GoldHttpTrader): Promise<void> {
@@ -125,5 +156,6 @@ export class GoldRoom extends DurableObject<Env> {
     if (this.meta) this.meta.feed = feedKindFromLive(this.live);
     if (this.bid > 0 && this.ask >= this.bid) await trader.onTick({ bid: this.bid, ask: this.ask, volume: 1 });
     else if (this.mid > 0) await trader.onTick(demoTickFromMid(this.mid));
+    this.proofDirty = true;
   }
 }
