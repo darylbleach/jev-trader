@@ -38,6 +38,23 @@ export function startGoldServer(trader: GoldTrader, meta: Meta) {
       if (pathname === "/export" && req.method === "GET") return json(trader.exportProof());
       if ((pathname === "/pause" || pathname === "/entries/pause") && req.method === "POST") return json(trader.pauseEntries());
       if (pathname === "/resume" && req.method === "POST") return json(trader.resumeEntries());
+      if ((pathname === "/reset" || pathname === "/session/reset") && req.method === "POST") {
+        let body: unknown = null;
+        try {
+          const text = await req.text();
+          body = text.trim() ? JSON.parse(text) : null;
+        } catch {
+          return json({ error: "invalid json" }, 400);
+        }
+        const confirm =
+          body && typeof body === "object" && "confirm" in body
+            ? String((body as { confirm: unknown }).confirm)
+            : "";
+        if (confirm !== "wipe") {
+          return json({ error: 'confirm wipe required: POST {"confirm":"wipe"}' }, 400);
+        }
+        return json(trader.resetSession());
+      }
       if (pathname === "/signal" && req.method === "GET") {
         const latest = trader.signal();
         return latest ? json(latest) : json({ error: "no signal yet" }, 404);

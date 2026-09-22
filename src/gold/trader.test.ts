@@ -365,3 +365,42 @@ test("POST /pause blocks new entries and survives proof hydrate", async () => {
   await restored.onTick({ bid: 2650, ask: 2650.5 }, 4_000);
   expect(restored.snapshot().openTicket?.side).toBe("buy");
 });
+
+test("resetSession wipes scored tape, clears force pause, and refreshes startedAt", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+  hydrateFlat(trader, [closedLoss(1, 11), closedLoss(2, -20), closedLoss(3, -38)]);
+  trader.pauseEntries();
+  expect(trader.snapshot().wins + trader.snapshot().losses).toBe(3);
+  expect(trader.snapshot().realizedUsd).toBe(-47);
+  expect(trader.snapshot().entriesPaused).toBe(true);
+  expect(trader.exportProof().entriesForcePaused).toBe(true);
+  const beforeStarted = trader.startedAt;
+
+  const wiped = trader.resetSession(9_000);
+  expect(wiped.ok).toBe(true);
+  expect(wiped.startedAt).toBe(9_000);
+  expect(wiped.wins).toBe(0);
+  expect(wiped.losses).toBe(0);
+  expect(wiped.realizedUsd).toBe(0);
+  expect(wiped.entriesPaused).toBe(false);
+  expect(wiped.entriesForcePaused).toBe(false);
+  expect(wiped.openTicket).toBeNull();
+
+  const snap = trader.snapshot();
+  expect(snap.startedAt).toBe(9_000);
+  expect(snap.startedAt).not.toBe(beforeStarted);
+  expect(snap.wins).toBe(0);
+  expect(snap.losses).toBe(0);
+  expect(snap.realizedUsd).toBe(0);
+  expect(snap.dummyTrades).toHaveLength(0);
+  expect(snap.openTicket).toBeNull();
+  expect(snap.entriesPaused).toBe(false);
+  expect(snap.pauseReason).toBeNull();
+  expect(snap.realizedPeak).toBe(0);
+  expect(trader.exportProof(9_001).entriesForcePaused).toBe(false);
+  expect(trader.exportProof(9_001).dummy?.trades).toHaveLength(0);
+
+  await trader.onTick({ bid: 2650, ask: 2650.5 }, 10_000);
+  expect(trader.snapshot().openTicket?.side).toBe("buy");
+  expect(trader.snapshot().entriesPaused).toBe(false);
+});

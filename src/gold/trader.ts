@@ -246,6 +246,60 @@ export class GoldTrader {
   }
 
   /**
+   * Admin wipe: clear dummy tape, wins/losses/realized, open ticket, force-pause,
+   * and refresh startedAt so the room scores a fresh session. Pause/resume remain.
+   * Persists via the proof blob (caller must flush on Cloudflare).
+   */
+  resetSession(now = Date.now()): {
+    ok: true;
+    startedAt: number;
+    wins: number;
+    losses: number;
+    realizedUsd: number;
+    entriesPaused: boolean;
+    entriesForcePaused: boolean;
+    openTicket: DummyTicket | null;
+  } {
+    if (this.dummy) this.dummy.resetSession();
+    this.history.length = 0;
+    this.fills = [];
+    this.seq = 0;
+    this.position = "flat";
+    this.lastSignal = null;
+    this.lastError = null;
+    this.totals = {
+      ticks: 0,
+      decisions: 0,
+      lateTicks: 0,
+      fills: 0,
+      jevUsd: 0,
+      realizedUsd: 0,
+      unrealizedUsd: 0,
+      pnlUsd: 0,
+      wins: 0,
+      losses: 0,
+    };
+    this.entriesForcePaused = false;
+    this.entriesPaused = false;
+    this.pauseReason = null;
+    this.realizedPeak = 0;
+    this.startedAt = now;
+    const quote = quoteFromTick(this.lastTick);
+    const dummy = this.refreshPnL(quote);
+    this.onProofChange();
+    return {
+      ok: true,
+      startedAt: this.startedAt,
+      wins: dummy.wins,
+      losses: dummy.losses,
+      realizedUsd: dummy.realizedUsd,
+      entriesPaused: this.entriesPaused,
+      entriesForcePaused: this.entriesForcePaused,
+      openTicket: dummy.openTicket,
+    };
+  }
+
+  /**
    * Rebase the peak-drawdown gate so a watched room can try again.
    * Clears a manual POST /pause latch. Does not close open tickets.
    * The hard floor (default -$80) cannot be cleared.
