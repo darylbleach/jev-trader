@@ -50,9 +50,11 @@ export class GoldTrader {
   };
   private lastError: string | null = null;
   private dummy: DummyMt5Account | null;
-  /** Derived each tick from peak drawdown and the hard floor. Demo only. */
+  /** Derived each tick from peak drawdown, hard floor, and optional force latch. Demo only. */
   private entriesPaused = false;
   private pauseReason: DummyPauseReason | null = null;
+  /** Operator latch from POST /pause. Survives ticks and proof hydrate until POST /resume. */
+  private entriesForcePaused = false;
   /** Highest realized P/L this session. Resume can rebase it unless the hard floor is hit. */
   private realizedPeak = 0;
   startedAt: number;
@@ -84,6 +86,8 @@ export class GoldTrader {
         jevUsd: this.totals.jevUsd,
       },
       dummy: this.dummy ? this.dummy.exportState() : null,
+      entriesForcePaused: this.entriesForcePaused,
+      realizedPeak: this.realizedPeak,
     };
   }
 
@@ -111,7 +115,11 @@ export class GoldTrader {
     const quote = quoteFromTick(this.lastTick);
     this.refreshPnL(quote);
     const trades = this.dummy?.closedTrades ?? [];
-    this.realizedPeak = Math.max(realizedPeakFromTrades(trades), this.totals.realizedUsd);
+    this.entriesForcePaused = state.entriesForcePaused === true;
+    const peakFromTrades = realizedPeakFromTrades(trades);
+    const peakFromProof =
+      typeof state.realizedPeak === "number" && Number.isFinite(state.realizedPeak) ? state.realizedPeak : peakFromTrades;
+    this.realizedPeak = Math.max(peakFromTrades, peakFromProof, this.totals.realizedUsd);
     this.updateEntryPause(this.totals.realizedUsd);
   }
 
@@ -219,12 +227,33 @@ export class GoldTrader {
   }
 
   /**
+   * Operator stop: block new dummy entries until POST /resume.
+   * Does not close open tickets. Persists via the proof blob.
+   */
+  pauseEntries(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason: DummyPauseReason | null } {
+    const quote = quoteFromTick(this.lastTick);
+    const dummy = this.refreshPnL(quote);
+    this.entriesForcePaused = true;
+    this.entriesPaused = true;
+    this.pauseReason = "manual";
+    this.onProofChange();
+    return {
+      ok: true,
+      entriesPaused: true,
+      realizedUsd: dummy.realizedUsd,
+      pauseReason: this.pauseReason,
+    };
+  }
+
+  /**
    * Rebase the peak-drawdown gate so a watched room can try again.
-   * Does not close open tickets. The hard floor (default -$80) cannot be cleared.
+   * Clears a manual POST /pause latch. Does not close open tickets.
+   * The hard floor (default -$80) cannot be cleared.
    */
   resumeEntries(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason: DummyPauseReason | null } {
     const quote = quoteFromTick(this.lastTick);
     const dummy = this.refreshPnL(quote);
+    this.entriesForcePaused = false;
     const floorGate = shouldPauseDummyEntries({
       demo: goldConfig.demo,
       realizedUsd: dummy.realizedUsd,
@@ -259,8 +288,18 @@ export class GoldTrader {
       pauseDrawdownUsd: goldConfig.pauseRealizedUsd,
       pauseFloorUsd: goldConfig.pauseFloorUsd,
     });
-    this.entriesPaused = gate.pause;
-    this.pauseReason = gate.reason;
+    if (gate.pause) {
+      this.entriesPaused = true;
+      this.pauseReason = gate.reason;
+      return;
+    }
+    if (this.entriesForcePaused) {
+      this.entriesPaused = true;
+      this.pauseReason = "manual";
+      return;
+    }
+    this.entriesPaused = false;
+    this.pauseReason = null;
   }
 
   async onTick(tick: GoldTick, now = Date.now()): Promise<void> {

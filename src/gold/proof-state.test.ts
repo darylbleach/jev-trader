@@ -134,3 +134,20 @@ test("parseProofState accepts a full export blob", () => {
   expect(parsed?.totals.decisions).toBe(5);
   expect(parsed?.dummy?.wins).toBe(1);
 });
+
+test("parseProofState keeps the force-pause latch and peak", () => {
+  const blob: GoldProofState = {
+    version: 1,
+    savedAt: 10,
+    startedAt: 1,
+    seq: 3,
+    position: "flat",
+    totals: { ticks: 1, decisions: 1, lateTicks: 0, fills: 0, jevUsd: 0 },
+    dummy: null,
+    entriesForcePaused: true,
+    realizedPeak: -41,
+  };
+  const parsed = parseProofState(blob);
+  expect(parsed?.entriesForcePaused).toBe(true);
+  expect(parsed?.realizedPeak).toBe(-41);
+});

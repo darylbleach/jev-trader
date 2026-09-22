@@ -17,7 +17,8 @@ export interface GoldHttpTrader {
   onTick(tick: { bid: number; ask: number; volume?: number; ts?: number }): Promise<void>;
   reportFill(fill: GoldFill): GoldFill;
   exportProof?(now?: number): unknown;
-  resumeEntries?(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason?: "drawdown" | "floor" | null };
+  pauseEntries?(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason?: "drawdown" | "floor" | "manual" | null };
+  resumeEntries?(): { ok: true; entriesPaused: boolean; realizedUsd: number; pauseReason?: "drawdown" | "floor" | "manual" | null };
 }
 
 export const CORS = {
@@ -131,6 +132,10 @@ export async function handleGoldHttp(
   if (pathname === "/export" && request.method === "GET") {
     if (typeof trader.exportProof !== "function") return json({ error: "export unavailable" }, 501);
     return json(trader.exportProof(Date.now()));
+  }
+  if ((pathname === "/pause" || pathname === "/entries/pause") && request.method === "POST") {
+    if (typeof trader.pauseEntries !== "function") return json({ error: "pause unavailable" }, 501);
+    return json(trader.pauseEntries());
   }
   if (pathname === "/resume" && request.method === "POST") {
     if (typeof trader.resumeEntries !== "function") return json({ error: "resume unavailable" }, 501);

@@ -335,3 +335,33 @@ test("after a watched resume another deep hole re-pauses at the hard floor", asy
   await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);
   expect(trader.snapshot().openTicket).toBeNull();
 });
+
+test("POST /pause blocks new entries and survives proof hydrate", async () => {
+  const trader = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+  hydrateFlat(trader, [closedLoss(1, -9)]);
+  expect(trader.snapshot().entriesPaused).toBe(false);
+  const paused = trader.pauseEntries();
+  expect(paused.ok).toBe(true);
+  expect(paused.entriesPaused).toBe(true);
+  expect(paused.pauseReason).toBe("manual");
+  expect(trader.snapshot().entriesPaused).toBe(true);
+
+  await trader.onTick({ bid: 2650, ask: 2650.5 }, 1_000);
+  expect(trader.snapshot().openTicket).toBeNull();
+  expect(trader.snapshot().entriesPaused).toBe(true);
+  expect(trader.snapshot().pauseReason).toBe("manual");
+
+  const proof = trader.exportProof(2_000);
+  expect(proof.entriesForcePaused).toBe(true);
+  const restored = new GoldTrader(new FixedModel("buy"), new DummyMt5Account({ ...dummyOpts, fillMode: "book" }));
+  restored.hydrateProof(proof);
+  expect(restored.snapshot().entriesPaused).toBe(true);
+  expect(restored.snapshot().pauseReason).toBe("manual");
+  expect(restored.snapshot().realizedUsd).toBe(-9);
+  await restored.onTick({ bid: 2650, ask: 2650.5 }, 3_000);
+  expect(restored.snapshot().openTicket).toBeNull();
+
+  expect(restored.resumeEntries().entriesPaused).toBe(false);
+  await restored.onTick({ bid: 2650, ask: 2650.5 }, 4_000);
+  expect(restored.snapshot().openTicket?.side).toBe("buy");
+});
